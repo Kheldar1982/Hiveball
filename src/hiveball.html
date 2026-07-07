@@ -1,0 +1,1517 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Hiveball – Prototyp</title>
+<style>
+  :root {
+    --bg: #0f1720;
+    --panel: #1a2530;
+    --accent: #f2b705;
+    --blue: #3b82f6;
+    --red: #ef4444;
+    --line: #2f4050;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: #e8edf2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+  }
+  h1 { font-size: 1.3rem; margin: 4px 0 12px; letter-spacing: 0.5px; }
+  #wrap {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  #board-panel {
+    background: var(--panel);
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+  }
+  canvas {
+    display: block;
+    background: #16281c;
+    border-radius: 6px;
+    touch-action: manipulation;
+  }
+  #side-panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px;
+    width: 260px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .score-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+  .turns-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #9fb0bd;
+    margin-top: -6px;
+    margin-bottom: 4px;
+  }
+  .team-blue { color: var(--blue); }
+  .team-red { color: var(--red); }
+  #log {
+    background: #0f1720;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px;
+    height: 200px;
+    overflow-y: auto;
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+  .log-header {
+    font-weight: 700;
+    padding: 3px 6px;
+    margin-top: 4px;
+    border-radius: 4px 4px 0 0;
+    color: #fff;
+  }
+  .log-line {
+    padding: 1px 6px 1px 20px;
+    color: #cfd8e0;
+    border-radius: 0 0 4px 4px;
+  }
+  .log-team-blue { background: rgba(59,130,246,0.14); }
+  .log-team-red { background: rgba(239,68,68,0.12); }
+  #preview {
+    background: #14202b;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 8px;
+    min-height: 70px;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: #e8edf2;
+  }
+  #preview b { color: var(--accent); }
+  #preview .chance-good { color: #6ee787; font-weight: 700; }
+  #preview .chance-bad { color: #ff8787; font-weight: 700; }
+  button {
+    background: var(--accent);
+    color: #1a1300;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.95rem;
+  }
+  button:disabled {
+    background: #4a4536;
+    color: #8a8a8a;
+    cursor: not-allowed;
+  }
+  button.secondary {
+    background: #2f4050;
+    color: #e8edf2;
+  }
+  #status {
+    font-size: 0.9rem;
+    min-height: 40px;
+    color: #cfd8e0;
+  }
+  .legend {
+    font-size: 0.75rem;
+    color: #9fb0bd;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<h1>🏈 Hiveball – Kernspiel-Prototyp</h1>
+
+<div id="wrap">
+  <div id="board-panel">
+    <canvas id="field" width="780" height="420"></canvas>
+  </div>
+
+  <div id="side-panel">
+    <div class="score-row">
+      <span class="team-blue">Blau (Du)</span>
+      <span id="score-blue">0</span>
+    </div>
+    <div class="score-row">
+      <span class="team-red">Rot (KI)</span>
+      <span id="score-red">0</span>
+    </div>
+    <div class="turns-row">
+      <span id="turns-blue">Züge: 0/10</span>
+      <span id="turns-red">Züge: 0/10</span>
+    </div>
+
+    <div id="status">Wähle einen blauen Spieler aus.</div>
+
+    <button id="btn-block" disabled>Block ausführen</button>
+    <button id="btn-pass" disabled>Passen</button>
+    <button id="btn-endturn" class="secondary">Zug beenden</button>
+
+    <div id="preview">Fahre mit der Maus über ein Feld oder einen Spieler, um die Erfolgschancen zu sehen.</div>
+
+    <div id="log"></div>
+
+    <div class="legend">
+      <b>Steuerung:</b><br>
+      1. Spieler anklicken (blau, nicht erschöpft)<br>
+      2. Grün markiertes Feld anklicken = bewegen<br>
+      3. Gegner direkt neben deinem Spieler anklicken = blocken<br>
+      4. "Passen" klicken, dann Mitspieler anklicken = Ball anspielen<br>
+      5. "Zug beenden" wenn fertig
+      <br><br>
+      <b>Attribute:</b><br>
+      MR = Movement Range · BL = Block-Duell · ST vs CO = Verletzungscheck nach verlorenem Block · AG = Ballaufnahme/Fangen · PA = Pass-Genauigkeit
+      <br><br>
+      <b>Würfel:</b> Alle Würfe nutzen einen W10. Eine gewürfelte <b>10</b> ist immer ein Erfolg (bei Duellen: automatischer Sieg), eine gewürfelte <b>1</b> immer ein Misserfolg (bei Duellen: automatische Niederlage) – unabhängig vom Zielwert bzw. den Werten des Gegners.
+      <br><br>
+      <b>Tacklezonen:</b> Jeder stehende Spieler kontrolliert die 8 Felder um sich herum (dezent farbig markiert). Fangen, Werfen und Ballaufnahme werden pro gegnerischer Tacklezone, in der man sich befindet, um 1 erschwert.
+      <br><br>
+      <b>Tackle:</b> Bewegt sich ein Spieler (der <b>Dodger</b>) aus dem Feld eines Gegners (dem <b>Tackler</b>) heraus, darf der Tackler tackeln: BL gegen AG des Dodgers. Bleibt der Dodger dabei in der Tacklezone desselben Tacklers, erhält dieser +1 auf seinen Wurf. Gewinnt der Tackler, fällt der Dodger an seiner Ausgangsposition um (inkl. Verletzungscheck), die Bewegung wird abgebrochen. Würfelt der Tackler dabei eine natürliche 1, verreißt er den Tackle und stürzt selbst (ebenfalls mit Verletzungsrisiko).
+      <br><br>
+      <b>Positionen:</b> Jedes Team besteht aus 2× 🛡️ Blocker, 1× 🎯 Werfer, 1× 🙌 Fänger, 1× 🏃 Läufer – erkennbar am Icon auf dem Spieler. Die kleine Zahl im Kreis unten rechts ist die Trikotnummer (1–5, pro Team eigenständig vergeben).
+      <br><br>
+      <b>Spielende:</b> Sieg sofort bei 3 Touchdowns. Sonst endet das Spiel, wenn beide Teams je 10 Züge absolviert haben – dann gewinnt das Team mit mehr Touchdowns, bei Gleichstand ist es ein Unentschieden.
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   KONSTANTEN & GRUNDAUFBAU
+   ============================================================ */
+const COLS = 13, ROWS = 7;         // Spielfeldgröße in Feldern
+const CELL = 60;                    // Pixelgröße pro Feld
+const canvas = document.getElementById('field');
+const ctx = canvas.getContext('2d');
+
+const TEAM_BLUE = 0, TEAM_RED = 1;
+const teams = [
+  { name: 'Blau', color: '#3b82f6', endzoneCol: COLS - 1, score: 0, human: true },
+  { name: 'Rot',  color: '#ef4444', endzoneCol: 0,         score: 0, human: false }
+];
+
+let players = [];
+let ball = { x: 0, y: 0, carrierId: null };
+let currentTeam = TEAM_BLUE;
+let selectedPlayerId = null;
+let passMode = false;
+
+// Spielende-Regeln: Sieg ab WIN_SCORE Touchdowns, sonst Ende nach MAX_TURNS_PER_TEAM
+// Zügen pro Team (bei Gleichstand Unentschieden).
+const WIN_SCORE = 3;
+const MAX_TURNS_PER_TEAM = 10;
+let turnsPlayed = [0, 0]; // Index entspricht TEAM_BLUE / TEAM_RED
+let gameEnded = false;
+
+/* ============================================================
+   POSITIONEN
+   ============================================================ */
+// CO ist bewusst um TEMP_CO_BONUS erhöht (temporärer Ausgleich, bis es ein
+// Ausrüstungssystem gibt). Die restlichen Werte summieren sich je Position auf 20
+// (BL+ST+CO+AG+PA), MR steht separat außerhalb dieses Budgets.
+const TEMP_CO_BONUS = 3;
+
+const POSITIONS = {
+  Blocker: { icon: '🛡️', mr: 4, bl: 5, st: 5, co: 5 + TEMP_CO_BONUS, ag: 2, pa: 3 },
+  Läufer:  { icon: '🏃', mr: 6, bl: 3, st: 3, co: 3 + TEMP_CO_BONUS, ag: 6, pa: 5 },
+  Fänger:  { icon: '🙌', mr: 6, bl: 2, st: 2, co: 3 + TEMP_CO_BONUS, ag: 7, pa: 6 },
+  Werfer:  { icon: '🎯', mr: 5, bl: 3, st: 3, co: 4 + TEMP_CO_BONUS, ag: 4, pa: 6 },
+};
+
+// Team-Zusammensetzung "Option A": 2 Blocker, 1 Läufer, 1 Fänger, 1 Werfer
+const TEAM_ROSTER = ['Blocker', 'Blocker', 'Werfer', 'Fänger', 'Läufer'];
+
+// Aufstehen aus der Bodenlage kostet Bewegungspunkte (analog zu vielen Football-Regelwerken),
+// damit ein Umfallen auch dann eine spürbare Konsequenz hat, wenn es während des gegnerischen
+// Zuges passiert ist – der Spieler steht nicht automatisch gratis vor dem eigenen Zug auf.
+const STAND_UP_COST = 2;
+
+/* ============================================================
+   SPIEL AUFSETZEN
+   ============================================================ */
+function createPlayer(id, number, team, position, x, y) {
+  const stats = POSITIONS[position];
+  return {
+    id,           // intern eindeutige ID (über beide Teams hinweg) – für Spiellogik
+    number,       // Anzeige-Trikotnummer 1-5, innerhalb des eigenen Teams eindeutig
+    team, x, y, position,
+    startX: x, startY: y,
+    mr: stats.mr,
+    movesLeft: stats.mr,
+    bl: stats.bl,
+    st: stats.st,
+    co: stats.co,
+    ag: stats.ag,
+    pa: stats.pa,
+    prone: false,
+    injured: false,
+    acted: false
+  };
+}
+
+function setupTeams() {
+  players = [];
+  let id = 0;
+  const ys = [1, 2, 3, 4, 5];
+  // Team Blau links, greift nach rechts an
+  ys.forEach((y, i) => players.push(createPlayer(id++, i + 1, TEAM_BLUE, TEAM_ROSTER[i], 2, y)));
+  // Team Rot rechts, greift nach links an
+  ys.forEach((y, i) => players.push(createPlayer(id++, i + 1, TEAM_RED, TEAM_ROSTER[i], COLS - 3, y)));
+}
+
+function resetBallToCenter() {
+  ball.x = Math.floor(COLS / 2);
+  ball.y = Math.floor(ROWS / 2);
+  ball.carrierId = null;
+}
+
+function startKickoff() {
+  players.forEach(p => {
+    p.x = p.startX; p.y = p.startY;
+    p.prone = false; p.acted = false;
+    p.movesLeft = p.mr;
+  });
+  resetBallToCenter();
+}
+
+/* ============================================================
+   HILFSFUNKTIONEN
+   ============================================================ */
+function playerAt(x, y) {
+  return players.find(p => !p.injured && p.x === x && p.y === y);
+}
+function chebyshev(x1, y1, x2, y2) {
+  return Math.max(Math.abs(x1 - x2), Math.abs(y1 - y2));
+}
+
+// Zählt, in wie vielen gegnerischen Tacklezonen sich eine Position befindet.
+// Eine Tacklezone sind die 8 Felder um einen stehenden (nicht liegenden/verletzten) Spieler.
+function countEnemyTackleZones(x, y, team) {
+  return players.filter(p =>
+    p.team !== team &&
+    !p.prone &&
+    !p.injured &&
+    chebyshev(p.x, p.y, x, y) === 1
+  ).length;
+}
+function isAdjacent(a, b) {
+  return chebyshev(a.x, a.y, b.x, b.y) === 1;
+}
+
+// Sucht den besten Bewegungspfad von (x1,y1) nach (x2,y2) über das Raster (8 Richtungen).
+// - Felder mit einem anderen Spieler sind hart blockiert (auch als Zwischenfeld).
+// - Felder in einer gegnerischen Tacklezone werden weich gemieden (Kosten-Aufschlag),
+//   AUSSER es ist das Zielfeld selbst – ein direkt angeklicktes Zielfeld in einer
+//   Tacklezone wird nie "bestraft", das ist ja die bewusste Absicht.
+// - maxSteps begrenzt die Suche auf die verfügbaren Bewegungspunkte.
+// Rückgabe: Liste von Schritten {x,y} (ohne Start, Ziel als letzter Eintrag) oder null,
+// falls innerhalb von maxSteps kein Weg existiert.
+function findSmartPath(x1, y1, x2, y2, team, maxSteps) {
+  if (x1 === x2 && y1 === y2) return [];
+
+  const key = (x, y) => x + ',' + y;
+  const neighbors = [
+    [-1, -1], [-1, 0], [-1, 1],
+    [ 0, -1],          [ 0, 1],
+    [ 1, -1], [ 1, 0], [ 1, 1]
+  ];
+
+  const bestCost = new Map();
+  const prev = new Map();
+  const startKey = key(x1, y1);
+  bestCost.set(startKey, 0);
+
+  const frontier = [{ x: x1, y: y1, cost: 0, steps: 0 }];
+  const visited = new Set();
+
+  while (frontier.length) {
+    frontier.sort((a, b) => a.cost - b.cost);
+    const current = frontier.shift();
+    const ck = key(current.x, current.y);
+    if (visited.has(ck)) continue;
+    visited.add(ck);
+
+    if (current.x === x2 && current.y === y2) break;
+    if (current.steps >= maxSteps) continue; // Bewegungspunkte für weitere Schritte aufgebraucht
+
+    for (const [dx, dy] of neighbors) {
+      const nx = current.x + dx, ny = current.y + dy;
+      if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) continue;
+      const nk = key(nx, ny);
+      if (visited.has(nk)) continue;
+      if (playerAt(nx, ny)) continue; // hart blockiert, egal ob Zwischenfeld oder Ziel
+
+      const isDestination = (nx === x2 && ny === y2);
+      const tzPenalty = (!isDestination && countEnemyTackleZones(nx, ny, team) > 0) ? 1 : 0;
+      const newSteps = current.steps + 1;
+      const newCost = current.cost + 1 + tzPenalty;
+
+      if (!bestCost.has(nk) || newCost < bestCost.get(nk)) {
+        bestCost.set(nk, newCost);
+        prev.set(nk, ck);
+        frontier.push({ x: nx, y: ny, cost: newCost, steps: newSteps });
+      }
+    }
+  }
+
+  const destKey = key(x2, y2);
+  if (!prev.has(destKey)) return null;
+
+  const path = [];
+  let ck = destKey;
+  while (ck !== startKey) {
+    const [px, py] = ck.split(',').map(Number);
+    path.unshift({ x: px, y: py });
+    ck = prev.get(ck);
+    if (ck === undefined) return null;
+  }
+  return path;
+}
+function rollD10() {
+  return 1 + Math.floor(Math.random() * 10);
+}
+
+// Baut aus einer Liste von {label, value}-Teilen einen lesbaren Rechen-String,
+// z.B. [{label:'AG', value:3}, {label:'Tacklezone(n)', value:2}] -> " + AG 3 + Tacklezone(n) 2"
+function formatParts(parts) {
+  return parts.map(p => ` ${p.value >= 0 ? '+' : '-'} ${p.label} ${Math.abs(p.value)}`).join('');
+}
+function sumParts(parts) {
+  return parts.reduce((s, p) => s + p.value, 0);
+}
+
+// Prüft einen Zielwert-Wurf (W10 + Attribut + Modifikatoren >= Zielwert + Zielwert-Modifikatoren).
+// Eine gewürfelte 10 ist IMMER ein Erfolg, eine gewürfelte 1 IMMER ein Misserfolg,
+// unabhängig von der Rechnung.
+// attrParts: Teile, die zum Wurf addiert werden (z.B. Attributswert)
+// baseTarget: Basis-Zielwert
+// targetMods: Teile, die den Zielwert erhöhen/senken (z.B. Tacklezonen)
+function rollAgainstTarget(attrParts, baseTarget, targetMods = []) {
+  const raw = rollD10();
+  const bonus = sumParts(attrParts);
+  const total = raw + bonus;
+  const target = baseTarget + sumParts(targetMods);
+
+  let success, critical;
+  if (raw === 10) { success = true; critical = 'Krit-Erfolg'; }
+  else if (raw === 1) { success = false; critical = 'Krit-Fehlschlag'; }
+  else { success = total >= target; critical = null; }
+
+  const targetDesc = targetMods.length
+    ? `${baseTarget}${formatParts(targetMods)} = ${target}`
+    : `${target}`;
+  const desc = `W10: ${raw}${formatParts(attrParts)} = ${total}  |  Ziel: ${targetDesc}  →  ${success ? 'Erfolg' : 'Fehlschlag'}${critical ? ' (' + critical + ')' : ''}`;
+
+  return { raw, total, target, success, critical, desc };
+}
+
+// Löst ein Duell zweier gegnerischer Würfe auf (z.B. Block, Verletzungscheck, Tackle).
+// Eine gewürfelte 10 gewinnt automatisch (außer der Gegner würfelt ebenfalls eine 10),
+// eine gewürfelte 1 verliert automatisch (außer der Gegner würfelt ebenfalls eine 1).
+// partsA / partsB: Teile, die zum jeweiligen Wurf addiert werden (Attribut + Modifikatoren)
+function rollOpposed(partsA, partsB) {
+  const rawA = rollD10(), rawB = rollD10();
+  const totalA = rawA + sumParts(partsA);
+  const totalB = rawB + sumParts(partsB);
+
+  let winner, note = '';
+  if (rawA === 10 && rawB !== 10) { winner = 'A'; note = ' (Krit!)'; }
+  else if (rawB === 10 && rawA !== 10) { winner = 'B'; note = ' (Krit!)'; }
+  else if (rawA === 1 && rawB !== 1) { winner = 'B'; note = ' (Gegner patzt!)'; }
+  else if (rawB === 1 && rawA !== 1) { winner = 'A'; note = ' (Gegner patzt!)'; }
+  else if (totalA > totalB) winner = 'A';
+  else if (totalB > totalA) winner = 'B';
+  else winner = 'tie';
+
+  const descA = `W10: ${rawA}${formatParts(partsA)} = ${totalA}`;
+  const descB = `W10: ${rawB}${formatParts(partsB)} = ${totalB}`;
+
+  return { rawA, rawB, totalA, totalB, winner, note, descA, descB };
+}
+let currentLogTeamClass = ''; // Team-Farbe der aktuell laufenden Log-Aktion
+
+// Startet eine neue "Aktion" im Log (z.B. Zug, Block, Pass, Tackle) mit eigener
+// fett hervorgehobener Kopfzeile, eigenem Symbol und der Farbe der ausführenden Mannschaft.
+// team: TEAM_BLUE oder TEAM_RED – bestimmt die Hintergrundfarbe dieser Aktion.
+function logAction(title, icon = '▶', team = TEAM_BLUE) {
+  currentLogTeamClass = 'log-team-' + (team === TEAM_BLUE ? 'blue' : 'red');
+  const el = document.getElementById('log');
+  const header = document.createElement('div');
+  header.className = 'log-header ' + currentLogTeamClass;
+  header.textContent = icon + ' ' + title;
+  el.appendChild(header);
+  el.scrollTop = el.scrollHeight;
+}
+
+// Detailzeile innerhalb der aktuell laufenden Aktion (gleiche Einfärbung wie deren Kopfzeile)
+function log(msg) {
+  const el = document.getElementById('log');
+  const line = document.createElement('div');
+  line.className = 'log-line ' + currentLogTeamClass;
+  line.textContent = '› ' + msg;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+function setStatus(msg) {
+  document.getElementById('status').textContent = msg;
+}
+function updateScoreboard() {
+  document.getElementById('score-blue').textContent = teams[TEAM_BLUE].score;
+  document.getElementById('score-red').textContent = teams[TEAM_RED].score;
+  document.getElementById('turns-blue').textContent = `Züge: ${turnsPlayed[TEAM_BLUE]}/${MAX_TURNS_PER_TEAM}`;
+  document.getElementById('turns-red').textContent = `Züge: ${turnsPlayed[TEAM_RED]}/${MAX_TURNS_PER_TEAM}`;
+}
+
+/* ============================================================
+   ZEICHNEN
+   ============================================================ */
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Spielfeld-Streifen
+  for (let x = 0; x < COLS; x++) {
+    ctx.fillStyle = (x % 2 === 0) ? '#173420' : '#1c3d26';
+    ctx.fillRect(x * CELL, 0, CELL, ROWS * CELL);
+  }
+  // Endzonen
+  ctx.fillStyle = 'rgba(59,130,246,0.25)';
+  ctx.fillRect(teams[TEAM_BLUE].endzoneCol * CELL, 0, CELL, ROWS * CELL);
+  ctx.fillStyle = 'rgba(239,68,68,0.25)';
+  ctx.fillRect(teams[TEAM_RED].endzoneCol * CELL, 0, CELL, ROWS * CELL);
+
+  // Gitterlinien
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  for (let x = 0; x <= COLS; x++) {
+    ctx.beginPath(); ctx.moveTo(x * CELL, 0); ctx.lineTo(x * CELL, ROWS * CELL); ctx.stroke();
+  }
+  for (let y = 0; y <= ROWS; y++) {
+    ctx.beginPath(); ctx.moveTo(0, y * CELL); ctx.lineTo(COLS * CELL, y * CELL); ctx.stroke();
+  }
+
+  // Tacklezonen: die 8 Felder um jeden stehenden Spieler dezent markieren
+  players.filter(p => !p.prone && !p.injured).forEach(p => {
+    ctx.fillStyle = p.team === TEAM_BLUE ? 'rgba(59,130,246,0.10)' : 'rgba(239,68,68,0.10)';
+    for (let ox = -1; ox <= 1; ox++) {
+      for (let oy = -1; oy <= 1; oy++) {
+        if (ox === 0 && oy === 0) continue;
+        const tx = p.x + ox, ty = p.y + oy;
+        if (tx < 0 || tx >= COLS || ty < 0 || ty >= ROWS) continue;
+        ctx.fillRect(tx * CELL, ty * CELL, CELL, CELL);
+      }
+    }
+  });
+
+  // Erreichbare Felder des ausgewählten Spielers markieren
+  const sel = players.find(p => p.id === selectedPlayerId);
+  if (sel && currentTeam === TEAM_BLUE && !sel.prone) {
+    for (let x = 0; x < COLS; x++) {
+      for (let y = 0; y < ROWS; y++) {
+        const d = chebyshev(sel.x, sel.y, x, y);
+        // Chebyshev-Distanz ist eine untere Schranke für die tatsächliche Weglänge -
+        // schnelle Vorab-Ablehnung, bevor die (teurere) Pfadsuche läuft.
+        if (d > 0 && d <= sel.movesLeft) {
+          const path = findSmartPath(sel.x, sel.y, x, y, sel.team, sel.movesLeft);
+          if (path) {
+            ctx.fillStyle = 'rgba(80,220,120,0.35)';
+            ctx.fillRect(x * CELL + 2, y * CELL + 2, CELL - 4, CELL - 4);
+          }
+        }
+      }
+    }
+  }
+
+  // Ball (falls nicht getragen)
+  if (ball.carrierId === null) {
+    drawBall(ball.x * CELL + CELL / 2, ball.y * CELL + CELL / 2);
+  }
+
+  // Spieler (verletzte Spieler sind vom Feld und werden nicht gezeichnet)
+  players.filter(p => !p.injured).forEach(p => {
+    const cx = p.x * CELL + CELL / 2;
+    const cy = p.y * CELL + CELL / 2;
+    const icon = (POSITIONS[p.position] && POSITIONS[p.position].icon) || '❓';
+
+    // Team-farbiger Hintergrundkreis (gibt weiterhin die Team-Zugehörigkeit an)
+    ctx.beginPath();
+    ctx.arc(cx, cy, CELL * 0.32, 0, Math.PI * 2);
+    ctx.fillStyle = teams[p.team].color;
+    ctx.globalAlpha = p.prone ? 0.4 : (p.acted ? 0.7 : 1);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    if (p.id === selectedPlayerId) {
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#f2b705';
+      ctx.stroke();
+    } else {
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#0b0f14';
+      ctx.stroke();
+    }
+
+    // Positions-Icon statt reiner Nummer als zentrales Erkennungsmerkmal
+    ctx.font = (CELL * 0.42) + 'px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(icon, cx, cy + 1);
+
+    // Trikotnummer (1-5 pro Team) als kleines Badge unten rechts
+    const bx = cx + CELL * 0.22, by = cy + CELL * 0.22;
+    ctx.beginPath();
+    ctx.arc(bx, by, CELL * 0.15, 0, Math.PI * 2);
+    ctx.fillStyle = '#0b0f14';
+    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = teams[p.team].color;
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold ' + (CELL * 0.2) + 'px sans-serif';
+    ctx.fillText(p.number, bx, by + 1);
+
+    if (p.prone) {
+      ctx.font = '10px sans-serif';
+      ctx.fillStyle = '#ffdddd';
+      ctx.textAlign = 'center';
+      ctx.fillText('am Boden', cx, cy + CELL * 0.42);
+    }
+
+    if (ball.carrierId === p.id) {
+      drawBall(cx - CELL * 0.28, cy - CELL * 0.28);
+    }
+  });
+}
+
+function drawBall(x, y) {
+  ctx.beginPath();
+  ctx.ellipse(x, y, 8, 6, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#c98a3b';
+  ctx.fill();
+  ctx.strokeStyle = '#5a3814';
+  ctx.stroke();
+}
+
+/* ============================================================
+   SPIELLOGIK: BEWEGUNG, BALL, BLOCK
+   ============================================================ */
+function tryPickupBall(player) {
+  if (ball.carrierId !== null) return true; // schon getragen, nichts zu tun
+  if (player.x !== ball.x || player.y !== ball.y) return true; // steht nicht auf dem Ball
+
+  const tz = countEnemyTackleZones(player.x, player.y, player.team);
+  const r = rollAgainstTarget(
+    [{ label: 'AG', value: player.ag }],
+    8,
+    tz > 0 ? [{ label: 'Tacklezone(n)', value: tz }] : []
+  );
+  log(`${teams[player.team].name} #${player.number} versucht Ball aufzunehmen: ${r.desc}`);
+
+  if (r.success) {
+    ball.carrierId = player.id;
+    setStatus(`Spieler ${player.number} hat den Ball!`);
+    return true;
+  } else {
+    scatterBallNear(player.x, player.y);
+    if (ball.carrierId === null) setStatus('Ballaufnahme fehlgeschlagen – Zug beendet (Turnover)!');
+    else setStatus(`Turnover – aber der Ball landete direkt bei jemandem!`);
+    return false; // signalisiert Turnover
+  }
+}
+
+function checkScore(player) {
+  if (ball.carrierId !== player.id) return false;
+  if (player.x === teams[player.team].endzoneCol) {
+    teams[player.team].score++;
+    log(`🏈 TOUCHDOWN für ${teams[player.team].name}!`);
+    updateScoreboard();
+    if (teams[player.team].score >= WIN_SCORE) {
+      endGame(`${teams[player.team].name} gewinnt mit ${WIN_SCORE} Touchdowns!`);
+    } else {
+      startKickoff();
+    }
+    return true;
+  }
+  return false;
+}
+
+// Beendet das Spiel endgültig: sperrt alle Eingaben und zeigt das Ergebnis an.
+function endGame(message) {
+  gameEnded = true;
+  selectedPlayerId = null;
+  passMode = false;
+  log(`🏁 ${message}`);
+  setStatus(`🏁 ${message}`);
+  document.getElementById('btn-block').disabled = true;
+  document.getElementById('btn-pass').disabled = true;
+  document.getElementById('btn-endturn').disabled = true;
+  draw();
+}
+
+// Wird aufgerufen, bevor ein Dodger (sich bewegender Spieler) sein Feld verlässt.
+// Jeder Gegner (Tackler), der den Dodger auf dessen Startfeld in seiner Tacklezone
+// hatte, darf einen Tackle-Versuch durchführen: BL des Tacklers gegen AG des Dodgers.
+// Bleibt der Dodger nach der Bewegung weiterhin in der Tacklezone desselben Tacklers,
+// erhält der Tackler einen Bonus von +1 auf seinen Wurf.
+// Gibt true zurück, wenn der Dodger dabei umfällt (Bewegung wird dann abgebrochen).
+function attemptLeavingTackleZones(dodger, destX, destY) {
+  const startX = dodger.x, startY = dodger.y;
+  const tacklers = players.filter(e =>
+    e.team !== dodger.team && !e.prone && !e.injured &&
+    chebyshev(e.x, e.y, startX, startY) === 1
+  );
+
+  for (const tackler of tacklers) {
+    const staysInZone = chebyshev(tackler.x, tackler.y, destX, destY) === 1;
+    const bonus = staysInZone ? 1 : 0;
+
+    const r = rollOpposed(
+      bonus > 0
+        ? [{ label: 'BL', value: tackler.bl }, { label: 'Zonenbonus', value: bonus }]
+        : [{ label: 'BL', value: tackler.bl }],
+      [{ label: 'AG', value: dodger.ag }]
+    );
+    log(`Tackle – ${teams[tackler.team].name} #${tackler.number}: ${r.descA}  vs  ${teams[dodger.team].name} #${dodger.number}: ${r.descB}${r.note}`);
+
+    // Würfelt der Tackler eine natürliche 1, stürzt er selbst und riskiert eine Verletzung –
+    // das gilt unabhängig davon, wer den Tackle am Ende gewinnt (auch im seltenen Fall,
+    // dass der Dodger ebenfalls eine 1 würfelt und der Tackler über die Summe doch gewinnt).
+    if (r.rawA === 1) {
+      tackler.prone = true;
+      log(`${teams[tackler.team].name} #${tackler.number} verreißt den Tackle und stürzt selbst!`);
+      const selfFall = rollOpposed([], [{ label: 'CO', value: tackler.co }]);
+      log(`Sturz-Verletzungscheck – ${teams[tackler.team].name} #${tackler.number}: ${selfFall.descA}  vs eigene CO: ${selfFall.descB}${selfFall.note}`);
+      if (selfFall.winner === 'A') {
+        tackler.injured = true;
+        setStatus(`Spieler ${tackler.number} stürzt beim verpatzten Tackle und verletzt sich!`);
+        log(`🚑 Spieler ${tackler.number} (${teams[tackler.team].name}) ist verletzt und verlässt das Feld.`);
+      }
+    }
+
+    if (r.winner === 'A') {
+      // Tackler gewinnt: Dodger fällt an seiner Ausgangsposition um, Bewegung wird abgebrochen
+      dodger.prone = true;
+      let ballDropped = false;
+      if (ball.carrierId === dodger.id) {
+        log('Der Ball fällt zu Boden und verspringt!');
+        scatterBallNear(startX, startY);
+        ballDropped = true;
+      }
+      const inj = rollOpposed([{ label: 'ST', value: tackler.st }], [{ label: 'CO', value: dodger.co }]);
+      log(`Verletzungscheck – ${teams[tackler.team].name} #${tackler.number}: ${inj.descA}  vs  ${teams[dodger.team].name} #${dodger.number}: ${inj.descB}${inj.note}`);
+      if (inj.winner === 'A') {
+        dodger.injured = true;
+        setStatus(`Spieler ${dodger.number} wird beim Tackle verletzt!`);
+        log(`🚑 Spieler ${dodger.number} (${teams[dodger.team].name}) ist verletzt und verlässt das Feld.`);
+      } else {
+        setStatus(`Spieler ${dodger.number} wird beim Tackle umgehauen!`);
+      }
+      // Ein Sturz mit Ballverlust ist immer ein Turnover; ein Sturz ohne Ball beendet
+      // den Zug nicht (andere Spieler können weiterhin handeln).
+      if (ballDropped) {
+        endTurn(true);
+      }
+      return true;
+    } else {
+      setStatus(`#${dodger.number} entkommt dem Tackle von #${tackler.number}.`);
+    }
+  }
+  return false;
+}
+
+// Wird nach jeder abgeschlossenen (oder abgebrochenen) Bewegung aufgerufen:
+// prüft Touchdown und Ballaufnahme. Gibt false zurück, falls die Aktion dadurch
+// den ganzen Zug beendet hat (Touchdown oder Turnover), sonst true.
+function finishArrival(player) {
+  if (checkScore(player)) {
+    endTurn(true);
+    return false;
+  }
+  const ok = tryPickupBall(player);
+  if (!ok) {
+    endTurn(true);
+    return false;
+  }
+  return true;
+}
+
+function movePlayer(player, x, y) {
+  logAction(`${teams[player.team].name} #${player.number} bewegt sich Richtung (${x},${y})`, '🏃', player.team);
+
+  const path = findSmartPath(player.x, player.y, x, y, player.team, player.movesLeft);
+  if (!path) {
+    log('Kein gangbarer Weg zum Ziel innerhalb der verbleibenden Bewegungspunkte gefunden.');
+    return;
+  }
+
+  for (const step of path) {
+    // Bewegungspunkte aufgebraucht -> Bewegung endet hier (z.B. Ziel weiter weg als MR erlaubt)
+    if (player.movesLeft <= 0) {
+      break;
+    }
+
+    // Zwischenfeld von einem anderen Spieler belegt -> Weg ist blockiert, Bewegung endet hier
+    if (playerAt(step.x, step.y)) {
+      log(`Weg blockiert bei (${step.x},${step.y}) – Bewegung endet vorzeitig.`);
+      break;
+    }
+
+    // Pro Schritt einzeln prüfen, ob ein Gegner tackeln darf – auch wenn der
+    // Spieler zu Beginn der Bewegung noch in keiner Tacklezone stand.
+    const knockedDown = attemptLeavingTackleZones(player, step.x, step.y);
+    if (knockedDown) {
+      updateActionButtons(player);
+      draw();
+      return;
+    }
+
+    player.x = step.x;
+    player.y = step.y;
+    player.movesLeft -= 1;
+  }
+
+  if (!finishArrival(player)) return;
+  updateActionButtons(player);
+  draw();
+}
+
+// Zählt die real zurückgelegte Strecke zwischen zwei Positionen in "Feldern".
+// Diagonalschritte zählen √2 ≈ 1,414 Felder (Pythagoras: Kathete 1, Hypotenuse √2),
+// gerade Schritte 1 Feld. Damit entspricht der Wert der tatsächlichen Distanz,
+// unabhängig davon ob gerade oder diagonal geworfen wird.
+function fieldsCrossed(x1, y1, x2, y2) {
+  const dx = Math.abs(x2 - x1), dy = Math.abs(y2 - y1);
+  const diag = Math.min(dx, dy);
+  const straight = Math.max(dx, dy) - diag;
+  return diag * Math.SQRT2 + straight;
+}
+
+function passDistanceLabel(fields) {
+  if (fields <= 3) return 'Kurzer Pass';
+  if (fields <= 6) return 'Langer Pass';
+  return 'Bombe';
+}
+
+function attemptPass(passer, target) {
+  // Reichweite UND Schwierigkeit basieren jetzt auf derselben Metrik (echte Distanz),
+  // dadurch ist die reale Reichweite unabhängig von der Wurfrichtung gleich.
+  const fields = fieldsCrossed(passer.x, passer.y, target.x, target.y);
+
+  if (fields > 9) {
+    setStatus('Zu weit entfernt für einen Pass.');
+    return;
+  }
+  if (target.id === passer.id) return;
+  if (target.prone) {
+    setStatus('Ein liegender Spieler kann den Ball nicht fangen.');
+    return;
+  }
+
+  logAction(`Pass: ${teams[passer.team].name} #${passer.number} → #${target.number}`, '🎯', passer.team);
+  const baseTarget = Math.ceil(5 + fields); // Zielwert: 5 + zurückgelegte Distanz, aufgerundet
+  const tzPasser = countEnemyTackleZones(passer.x, passer.y, passer.team);
+  const r = rollAgainstTarget(
+    [{ label: 'PA', value: passer.pa }],
+    baseTarget,
+    tzPasser > 0 ? [{ label: 'Tacklezone(n)', value: tzPasser }] : []
+  );
+  log(`${passDistanceLabel(fields)} (${fields} Felder, Basisziel 5 + ${fields} = ${baseTarget}): ${r.desc}`);
+
+  passer.acted = true;
+  ball.carrierId = null; // Ball ist erstmal "in der Luft"
+
+  if (!r.success) {
+    // Wurf daneben: Ball fällt in der Nähe des Werfers, Turnover
+    scatterBallNear(passer.x, passer.y);
+    if (ball.carrierId === null) setStatus('Der Pass geht daneben – Turnover!');
+    draw();
+    endTurn(true);
+    return;
+  }
+
+  // Wurf war gut genug, jetzt versucht der Zielspieler zu fangen
+  const tzCatcher = countEnemyTackleZones(target.x, target.y, target.team);
+  const catchResult = rollAgainstTarget(
+    [{ label: 'AG', value: target.ag }],
+    8,
+    tzCatcher > 0 ? [{ label: 'Tacklezone(n)', value: tzCatcher }] : []
+  );
+  log(`Fangversuch #${target.number}: ${catchResult.desc}`);
+
+  if (catchResult.success) {
+    ball.carrierId = target.id;
+    setStatus(`#${target.number} fängt den Pass!`);
+    draw();
+  } else {
+    scatterBallNear(target.x, target.y);
+    if (ball.carrierId === null) setStatus('Der Pass wird nicht gefangen – Turnover!');
+    draw();
+    endTurn(true);
+  }
+}
+
+function scatterBallNear(x, y) {
+  // Ball springt so lange auf eines der 8 angrenzenden Felder weiter, bis er entweder
+  // gefangen wird oder auf einem freien Feld liegen bleibt. Sicherheitslimit gegen
+  // eine theoretische Endlosschleife (z.B. falls das Feld an dieser Stelle sehr voll ist).
+  const offsets = [
+    [-1, -1], [-1, 0], [-1, 1],
+    [ 0, -1],          [ 0, 1],
+    [ 1, -1], [ 1, 0], [ 1, 1]
+  ];
+  const maxBounces = 20;
+  let cx = x, cy = y;
+
+  for (let i = 0; i < maxBounces; i++) {
+    const [dx, dy] = offsets[Math.floor(Math.random() * offsets.length)];
+    const nx = Math.min(COLS - 1, Math.max(0, cx + dx));
+    const ny = Math.min(ROWS - 1, Math.max(0, cy + dy));
+
+    ball.x = nx;
+    ball.y = ny;
+    ball.carrierId = null;
+
+    // Steht dort ein stehender Spieler (egal welches Team), darf er versuchen den Ball
+    // zu fangen – grundsätzlich erschwert um 1 (Zielwert 8 -> 9), zusätzlich erschwert
+    // durch Tacklezonen. Ein liegender Spieler kann NICHT fangen; der Ball streut dann
+    // einfach von dort aus weiter, ohne dort liegen zu bleiben.
+    const occupant = playerAt(nx, ny);
+    if (!occupant) {
+      log(`Ball liegt jetzt frei auf Feld (${nx}, ${ny}).`);
+      return;
+    }
+
+    if (occupant.prone) {
+      log(`Ball springt über den liegenden Spieler #${occupant.number} auf Feld (${nx},${ny}) hinweg und streut weiter.`);
+      cx = nx;
+      cy = ny;
+      continue;
+    }
+
+    const tz = countEnemyTackleZones(nx, ny, occupant.team);
+    const r = rollAgainstTarget(
+      [{ label: 'AG', value: occupant.ag }],
+      9,
+      tz > 0 ? [{ label: 'Tacklezone(n)', value: tz }] : []
+    );
+    log(`Ball landet bei ${teams[occupant.team].name} #${occupant.number} – erschwerter Fangversuch: ${r.desc}`);
+
+    if (r.success) {
+      ball.carrierId = occupant.id;
+      setStatus(`${teams[occupant.team].name} #${occupant.number} schnappt sich den lockeren Ball!`);
+      return;
+    }
+
+    // Fang fehlgeschlagen -> Ball springt von hier aus weiter
+    log(`Fang misslingt – Ball springt von (${nx},${ny}) weiter.`);
+    cx = nx;
+    cy = ny;
+  }
+
+  log('Der Ball springt ungewöhnlich oft weiter und bleibt an dieser Stelle liegen.');
+}
+
+function resolveBlock(attacker, defender) {
+  logAction(`Block: ${teams[attacker.team].name} #${attacker.number} vs ${teams[defender.team].name} #${defender.number}`, '🛡️', attacker.team);
+
+  // 1) BL-Duell entscheidet, wer umfällt
+  const blockResult = rollOpposed(
+    [{ label: 'BL', value: attacker.bl }],
+    [{ label: 'BL', value: defender.bl }]
+  );
+  log(`BL-Duell – ${teams[attacker.team].name} #${attacker.number}: ${blockResult.descA}  vs  ${teams[defender.team].name} #${defender.number}: ${blockResult.descB}${blockResult.note}`);
+
+  let winner = null, loser = null;
+  if (blockResult.winner === 'A') { winner = attacker; loser = defender; }
+  else if (blockResult.winner === 'B') { winner = defender; loser = attacker; }
+
+  if (!winner) {
+    setStatus('Unentschieden – beide bleiben stehen.');
+    attacker.acted = true;
+    draw();
+    return;
+  }
+
+  // Verlierer fällt erstmal um, Ball geht zu Boden und verspringt, falls er ihn trug
+  loser.prone = true;
+  let ballDropped = false;
+  if (ball.carrierId === loser.id) {
+    log('Der Ball fällt zu Boden und verspringt!');
+    scatterBallNear(loser.x, loser.y);
+    ballDropped = true;
+  }
+
+  // 2) Verletzungscheck: ST des Gewinners vs. CO des Verlierers
+  const injuryResult = rollOpposed(
+    [{ label: 'ST', value: winner.st }],
+    [{ label: 'CO', value: loser.co }]
+  );
+  const winnerBeatsLoser = injuryResult.winner === 'A'; // A = winner (ST), B = loser (CO)
+  log(`Verletzungscheck – ${teams[winner.team].name} #${winner.number}: ${injuryResult.descA}  vs  ${teams[loser.team].name} #${loser.number}: ${injuryResult.descB}${injuryResult.note}`);
+
+  if (winnerBeatsLoser) {
+    loser.injured = true;
+    setStatus(`Spieler ${loser.number} ist verletzt und scheidet aus!`);
+    log(`🚑 Spieler ${loser.number} (${teams[loser.team].name}) ist verletzt und verlässt das Feld.`);
+  } else {
+    setStatus(`Spieler ${loser.number} liegt am Boden, steht aber nächste Runde wieder auf.`);
+  }
+
+  attacker.acted = true;
+
+  // Turnover gilt nur, wenn das aktive Team (der Angreifer) selbst den Ball verliert –
+  // wirft man erfolgreich den GEGNERISCHEN Ballträger um, ist das kein Turnover,
+  // sondern ein guter Spielzug, der den eigenen Zug nicht beendet.
+  if (ballDropped && loser.team === attacker.team) {
+    endTurn(true);
+  } else {
+    draw();
+  }
+}
+
+/* ============================================================
+   ZUG-STEUERUNG
+   ============================================================ */
+function endTurn(forced) {
+  if (gameEnded) return;
+
+  turnsPlayed[currentTeam]++;
+  updateScoreboard();
+
+  selectedPlayerId = null;
+  passMode = false;
+  document.getElementById('btn-block').disabled = true;
+  document.getElementById('btn-pass').disabled = true;
+
+  currentTeam = 1 - currentTeam;
+  players.forEach(p => {
+    if (p.team === currentTeam) {
+      p.movesLeft = p.mr;
+      // Liegende Spieler bleiben liegen, bis sie aktiv ausgewählt/aktiviert werden
+      // (siehe standUpIfNeeded) – das Aufstehen kostet dann Bewegungspunkte.
+      p.acted = false;
+    }
+  });
+
+  draw();
+
+  // Zuglimit erreicht (beide Teams haben MAX_TURNS_PER_TEAM Züge absolviert)?
+  if (turnsPlayed[TEAM_BLUE] >= MAX_TURNS_PER_TEAM && turnsPlayed[TEAM_RED] >= MAX_TURNS_PER_TEAM) {
+    const blueScore = teams[TEAM_BLUE].score, redScore = teams[TEAM_RED].score;
+    if (blueScore > redScore) {
+      endGame(`Zuglimit erreicht (${MAX_TURNS_PER_TEAM} Züge je Team) – ${teams[TEAM_BLUE].name} gewinnt ${blueScore}:${redScore}!`);
+    } else if (redScore > blueScore) {
+      endGame(`Zuglimit erreicht (${MAX_TURNS_PER_TEAM} Züge je Team) – ${teams[TEAM_RED].name} gewinnt ${redScore}:${blueScore}!`);
+    } else {
+      endGame(`Zuglimit erreicht (${MAX_TURNS_PER_TEAM} Züge je Team) – Unentschieden ${blueScore}:${redScore}!`);
+    }
+    return;
+  }
+
+  if (currentTeam === TEAM_RED) {
+    setStatus('Rot (KI) ist am Zug...');
+    setTimeout(aiTurn, 700);
+  } else {
+    setStatus('Du bist am Zug – wähle einen Spieler.');
+  }
+}
+
+// Lässt einen liegenden Spieler aufstehen, sobald er aktiviert wird (ausgewählt bzw.
+// von der KI bearbeitet). Kostet STAND_UP_COST Bewegungspunkte für diesen Zug.
+function standUpIfNeeded(p) {
+  if (!p.prone) return;
+  p.prone = false;
+  p.movesLeft = Math.max(0, p.movesLeft - STAND_UP_COST);
+  log(`${teams[p.team].name} #${p.number} steht auf (kostet ${STAND_UP_COST} Bewegungspunkte, ${p.movesLeft} übrig).`);
+}
+
+/* ============================================================
+   EINFACHE KI
+   ============================================================ */
+// Wählt für einen KI-Spieler ein sinnvolles Bewegungsziel:
+// - Trägt er selbst den Ball: Richtung eigene Endzone (gerade Linie in seiner Reihe).
+// - Liegt der Ball frei: hin zum Ball.
+// - Trägt ein Mitspieler den Ball: einige Felder in Laufrichtung vorauslaufen (Eskorte/Blocker
+//   für den Ballträger), um Gegnern den Weg zu verstellen.
+// - Trägt ein Gegner den Ball: direkt auf ihn zulaufen (um ihn zu bedrängen/blocken).
+// Sucht das nächste freie Feld in der direkten Nachbarschaft (8 Felder) von (targetX,targetY),
+// bevorzugt dasjenige, das am nächsten an (fromX,fromY) liegt. Nötig, weil ein Bewegungsziel
+// für die Pfadsuche immer ein FREIES Feld sein muss (z.B. kann man nicht auf das Feld eines
+// gegnerischen Spielers laufen, nur direkt daneben).
+function nearestFreeCellNear(targetX, targetY, fromX, fromY) {
+  const offsets = [
+    [-1, -1], [-1, 0], [-1, 1],
+    [ 0, -1],          [ 0, 1],
+    [ 1, -1], [ 1, 0], [ 1, 1]
+  ];
+  let best = null, bestDist = Infinity;
+  offsets.forEach(([dx, dy]) => {
+    const nx = targetX + dx, ny = targetY + dy;
+    if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) return;
+    if (playerAt(nx, ny)) return;
+    const d = chebyshev(fromX, fromY, nx, ny);
+    if (d < bestDist) { bestDist = d; best = { x: nx, y: ny }; }
+  });
+  return best;
+}
+
+function aiChooseDestination(p) {
+  if (ball.carrierId === p.id) {
+    // Ziel-Spalte kann durch einen dort stehenden Spieler belegt sein -> nächstes freies
+    // Feld in dieser Spalte in der Nähe der aktuellen Reihe suchen.
+    const goal = { x: teams[TEAM_RED].endzoneCol, y: p.y };
+    if (!playerAt(goal.x, goal.y)) return goal;
+    return nearestFreeCellNear(goal.x, goal.y, p.x, p.y) || goal;
+  }
+  if (ball.carrierId === null) {
+    return { x: ball.x, y: ball.y }; // Feld eines losen Balls ist per Spiellogik immer frei
+  }
+  const carrier = players.find(x => x.id === ball.carrierId);
+  if (carrier.team === TEAM_RED) {
+    const dir = teams[TEAM_RED].endzoneCol > carrier.x ? 1 : -1;
+    const x = clamp(carrier.x + dir * 3, 0, COLS - 1);
+    const goal = { x, y: carrier.y };
+    if (!playerAt(goal.x, goal.y)) return goal;
+    return nearestFreeCellNear(goal.x, goal.y, p.x, p.y) || goal;
+  }
+  // Gegnerischer Ballträger: dessen Feld selbst ist immer belegt -> das nächste freie
+  // Feld direkt daneben ansteuern, um ihn zu bedrängen/blocken.
+  return nearestFreeCellNear(carrier.x, carrier.y, p.x, p.y) || { x: carrier.x, y: carrier.y };
+}
+
+// Ermittelt, ob ein Schritt von der aktuellen Position des Spielers nach (stepX,stepY)
+// riskant ist (irgendein Tackler mit Dodge-Erfolgschance < 50% für den Spieler).
+// Gibt den riskantesten Tackler zurück (niedrigste Erfolgschance) oder null, falls sicher.
+function findRiskiestTackle(p, stepX, stepY) {
+  const tacklers = players.filter(e =>
+    e.team !== p.team && !e.prone && !e.injured &&
+    chebyshev(e.x, e.y, p.x, p.y) === 1
+  );
+  if (!tacklers.length) return null;
+
+  let worst = null;
+  tacklers.forEach(t => {
+    const staysInZone = chebyshev(t.x, t.y, stepX, stepY) === 1;
+    const bonus = staysInZone ? 1 : 0;
+    const dodgeChance = 1 - opposedChance(t.bl + bonus, p.ag); // Chance, dass DER SPIELER (Dodger) gewinnt
+    if (!worst || dodgeChance < worst.dodgeChance) worst = { tackler: t, dodgeChance };
+  });
+  return worst.dodgeChance < 0.5 ? worst : null;
+}
+
+// Sucht unter den direkt angrenzenden Gegnern denjenigen mit der besten Blockchance für p.
+function findBestBlockOption(p) {
+  const adjEnemies = players.filter(e => e.team !== p.team && !e.prone && !e.injured && isAdjacent(p, e));
+  if (!adjEnemies.length) return null;
+
+  let best = null;
+  adjEnemies.forEach(e => {
+    const blockChance = opposedChance(p.bl, e.bl);
+    if (!best || blockChance > best.blockChance) best = { enemy: e, blockChance };
+  });
+  return best;
+}
+
+// Bewegt einen KI-Spieler vorsichtig Richtung (destX,destY): bricht die Bewegung ab,
+// sobald ein Schritt eine Dodge-Erfolgschance < 50% hätte – und blockt in diesem Fall
+// lieber einen angrenzenden Gegner, falls das eine bessere Erfolgschance bietet.
+function aiAdvanceCarefully(p, destX, destY) {
+  logAction(`${teams[p.team].name} #${p.number} bewegt sich vorsichtig Richtung (${destX},${destY})`, '🏃', p.team);
+
+  // Das eigentliche Ziel (z.B. der Ball) liegt oft weiter weg, als die Bewegungspunkte
+  // dieses Zuges reichen. Wir suchen daher zunächst den besten Gesamtweg über das ganze
+  // Feld (Suchradius = Feldgröße reicht überall hin) und laufen davon nur so viele
+  // Schritte, wie movesLeft erlaubt.
+  const fullPath = findSmartPath(p.x, p.y, destX, destY, p.team, COLS + ROWS);
+  if (!fullPath) {
+    log(`#${p.number} findet keinen gangbaren Weg zum Ziel (${destX},${destY}).`);
+    if (!finishArrival(p)) return;
+    draw();
+    return;
+  }
+  const path = fullPath.slice(0, p.movesLeft);
+
+  for (const step of path) {
+    if (p.movesLeft <= 0) break;
+
+    const risk = findRiskiestTackle(p, step.x, step.y);
+    if (risk) {
+      log(`#${p.number}: Dodge gegen #${risk.tackler.number} zu riskant (${Math.round(risk.dodgeChance * 100)}% Erfolgschance) – prüfe Alternativen.`);
+
+      const blockOption = !p.acted ? findBestBlockOption(p) : null;
+      if (blockOption && blockOption.blockChance > risk.dodgeChance) {
+        log(`#${p.number} blockt lieber #${blockOption.enemy.number} (${Math.round(blockOption.blockChance * 100)}% Erfolgschance statt Dodge).`);
+        resolveBlock(p, blockOption.enemy);
+        return;
+      }
+
+      log(`#${p.number} bricht die Bewegung ab, um den riskanten Dodge zu vermeiden.`);
+      break;
+    }
+
+    const knockedDown = attemptLeavingTackleZones(p, step.x, step.y);
+    if (knockedDown) {
+      updateActionButtons(p);
+      draw();
+      return;
+    }
+
+    p.x = step.x;
+    p.y = step.y;
+    p.movesLeft -= 1;
+  }
+
+  if (!finishArrival(p)) return;
+  draw();
+}
+
+function aiTurn() {
+  // Reihenfolge: eigener Ballträger zuerst (soll möglichst weit kommen, bevor sich das Feld
+  // durch die Bewegung der anderen verändert), danach die übrigen nach Nähe zum Ball.
+  // Liegende (nicht verletzte) Spieler werden mit aufgenommen – sie stehen gleich beim
+  // Aktivieren auf (kostet Bewegungspunkte, siehe standUpIfNeeded).
+  const redPlayers = players
+    .filter(p => p.team === TEAM_RED && !p.injured)
+    .sort((a, b) => {
+      if (ball.carrierId === a.id) return -1;
+      if (ball.carrierId === b.id) return 1;
+      return chebyshev(a.x, a.y, ball.x, ball.y) - chebyshev(b.x, b.y, ball.x, ball.y);
+    });
+
+  for (const p of redPlayers) {
+    if (gameEnded) return;
+    if (p.injured) continue; // könnte inzwischen durch einen Tackle verletzt worden sein
+    standUpIfNeeded(p);
+
+    const dest = aiChooseDestination(p);
+    if (p.movesLeft > 0 && (p.x !== dest.x || p.y !== dest.y)) {
+      aiAdvanceCarefully(p, dest.x, dest.y);
+      if (gameEnded || currentTeam !== TEAM_RED) return; // Zug wurde durch Touchdown, Spielende oder Turnover bereits beendet
+      if (p.prone || p.injured) continue; // beim Laufen getackelt worden
+    }
+
+    // Block versuchen, wenn ein Gegner direkt angrenzt (falls nicht schon oben stattdessen geblockt wurde)
+    if (!p.acted) {
+      const adjEnemies = players.filter(e => e.team === TEAM_BLUE && !e.prone && !e.injured && isAdjacent(p, e));
+      if (adjEnemies.length) {
+        const priority = adjEnemies.find(e => e.id === ball.carrierId) || adjEnemies[0];
+        resolveBlock(p, priority);
+        if (gameEnded || currentTeam !== TEAM_RED) return;
+      }
+    }
+  }
+
+  draw();
+  endTurn(true);
+}
+
+function updateActionButtons(p) {
+  const canBlock = players.some(e => e.team === TEAM_RED && !e.prone && !e.injured && isAdjacent(p, e));
+  document.getElementById('btn-block').disabled = !canBlock || p.acted;
+  document.getElementById('btn-pass').disabled = !(ball.carrierId === p.id) || p.acted;
+}
+
+/* ============================================================
+   VORSCHAU (Hover-Berechnungen vor der eigentlichen Aktion)
+   ============================================================ */
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+// Grober Näherungswert für die Erfolgswahrscheinlichkeit eines Opposed-Wurfs:
+// 50% Basis, verschoben um (Differenz der Boni)/10. Ignoriert absichtlich die
+// Krit-10/Krit-1-Sonderregel, da diese die Rechnung für eine Vorschau zu unübersichtlich macht.
+function opposedChance(bonusA, bonusB) {
+  const diff = bonusA - bonusB;
+  return clamp(0.5 + diff / 10, 0, 1);
+}
+
+function chanceSpan(chance) {
+  const pct = Math.round(chance * 100);
+  const cls = chance >= 0.5 ? 'chance-good' : 'chance-bad';
+  return `<span class="${cls}">${pct}%</span>`;
+}
+
+// Mindestwurf, der auf dem W10 benötigt wird, damit Wurf + Bonus >= Zielwert.
+// Wird für die Anzeige auf 1..10 begrenzt, mit Hinweis falls außerhalb des normal Möglichen
+// (dann greift nur noch die Krit-10/Krit-1-Regel).
+function neededRoll(target, bonus) {
+  const needed = target - bonus;
+  if (needed <= 1) return { needed: 1, note: '' };
+  if (needed > 10) return { needed: 10, note: ' (nur mit gewürfelter 10 möglich)' };
+  return { needed, note: '' };
+}
+
+function setPreview(html) {
+  document.getElementById('preview').innerHTML = html;
+}
+
+function previewMovePreview(dodger, destX, destY) {
+  const path = findSmartPath(dodger.x, dodger.y, destX, destY, dodger.team, dodger.movesLeft);
+
+  if (!path) {
+    return `<b>🏃 Bewegung nach (${destX},${destY})</b><br>⚠️ Kein gangbarer Weg innerhalb der verbleibenden Bewegungspunkte.`;
+  }
+
+  let html = `<b>🏃 Bewegung nach (${destX},${destY})</b><br>`;
+  let cx = dodger.x, cy = dodger.y;
+  let anyTackle = false;
+  const tackleLines = [];
+
+  for (const step of path) {
+    const tacklers = players.filter(e =>
+      e.team !== dodger.team && !e.prone && !e.injured &&
+      chebyshev(e.x, e.y, cx, cy) === 1
+    );
+    tacklers.forEach(t => {
+      anyTackle = true;
+      const staysInZone = chebyshev(t.x, t.y, step.x, step.y) === 1;
+      const bonus = staysInZone ? 1 : 0;
+      const chanceTackler = opposedChance(t.bl + bonus, dodger.ag);
+      tackleLines.push(
+        `Schritt (${cx},${cy})→(${step.x},${step.y}): #${t.number} (BL ${t.bl}${bonus ? '+1' : ''}) vs #${dodger.number} (AG ${dodger.ag}) → Tackler-Erfolg: ${chanceSpan(chanceTackler)}`
+      );
+    });
+
+    cx = step.x; cy = step.y;
+  }
+
+  if (!anyTackle) {
+    html += 'Kein Gegner kann auf dem Weg tackeln.<br>';
+  } else {
+    html += 'Mögliche Tackles (pro Schritt):<br>' + tackleLines.join('<br>') + '<br>';
+  }
+
+  // Liegt der Ball auf dem Zielfeld und wird gerade von niemandem getragen, würde die
+  // Bewegung eine Ballaufnahme auslösen – Zielwurf dafür anzeigen.
+  if (ball.carrierId === null && destX === ball.x && destY === ball.y) {
+    const tz = countEnemyTackleZones(destX, destY, dodger.team);
+    const target = 8 + tz;
+    const pickupRoll = neededRoll(target, dodger.ag);
+    html += `<br><u>🖐️ Ballaufnahme (#${dodger.number})</u><br>` +
+      `Ziel: 8${tz ? ' + ' + tz + ' Tacklezone(n)' : ''} = ${target}<br>` +
+      `AG ${dodger.ag} → benötigt Wurf ≥ ${pickupRoll.needed}${pickupRoll.note}`;
+  }
+
+  return html;
+}
+
+function previewBlockPreview(attacker, defender) {
+  const diff = attacker.bl - defender.bl;
+  const chanceA = opposedChance(attacker.bl, defender.bl);
+  return `<b>🛡️ Block</b><br>` +
+    `BL #${attacker.number} ${attacker.bl}  vs  BL #${defender.number} ${defender.bl}  (Differenz ${diff >= 0 ? '+' : ''}${diff})<br>` +
+    `Erfolg #${attacker.number}: ${chanceSpan(chanceA)} · Erfolg #${defender.number}: ${chanceSpan(1 - chanceA)}` +
+    `<br><small>(Näherung, ohne Krit-10/Krit-1)</small>`;
+}
+
+function previewPassPreview(passer, receiver) {
+  const fields = fieldsCrossed(passer.x, passer.y, receiver.x, receiver.y);
+  if (fields > 9) {
+    return `<b>🎯 Pass zu #${receiver.number}</b><br>Zu weit entfernt (${fields.toFixed(2)} Felder).`;
+  }
+
+  const baseTarget = Math.ceil(5 + fields);
+  const tzPasser = countEnemyTackleZones(passer.x, passer.y, passer.team);
+  const throwTarget = baseTarget + tzPasser;
+  const throwRoll = neededRoll(throwTarget, passer.pa);
+
+  const tzCatcher = countEnemyTackleZones(receiver.x, receiver.y, receiver.team);
+  const catchTarget = 8 + tzCatcher;
+  const catchRoll = neededRoll(catchTarget, receiver.ag);
+
+  return `<b>🎯 ${passDistanceLabel(fields)} zu #${receiver.number}</b> (${fields.toFixed(2)} Felder)<br>` +
+    `<u>Wurf (#${passer.number})</u>: Ziel ${baseTarget}${tzPasser ? ' + ' + tzPasser + ' Tacklezone(n)' : ''} = ${throwTarget}<br>` +
+    `PA ${passer.pa} → benötigt Wurf ≥ ${throwRoll.needed}${throwRoll.note}<br><br>` +
+    `<u>Fangen (#${receiver.number})</u>: Ziel 8${tzCatcher ? ' + ' + tzCatcher + ' Tacklezone(n)' : ''} = ${catchTarget}<br>` +
+    `AG ${receiver.ag} → benötigt Wurf ≥ ${catchRoll.needed}${catchRoll.note}`;
+}
+
+// Zentrale Funktion: entscheidet je nach aktuellem Modus (Pass/Block/Bewegung),
+// welche Vorschau beim Überfahren von Feld (x,y) angezeigt wird.
+function updateHoverPreview(x, y) {
+  if (currentTeam !== TEAM_BLUE) return;
+
+  const sel = players.find(p => p.id === selectedPlayerId);
+  const hovered = playerAt(x, y);
+
+  if (passMode && sel) {
+    if (hovered && hovered.team === TEAM_BLUE && hovered.id !== sel.id && !hovered.prone) {
+      setPreview(previewPassPreview(sel, hovered));
+    } else if (hovered && hovered.prone) {
+      setPreview('Ein liegender Spieler kann den Ball nicht fangen.');
+    } else {
+      setPreview('Fahre über einen Mitspieler, um die Passchancen zu sehen.');
+    }
+    return;
+  }
+
+  if (sel && !sel.prone) {
+    if (hovered && hovered.team === TEAM_RED && !hovered.prone && !hovered.injured && isAdjacent(sel, hovered)) {
+      setPreview(previewBlockPreview(sel, hovered));
+      return;
+    }
+    if (!hovered) {
+      const d = chebyshev(sel.x, sel.y, x, y);
+      // Chebyshev-Distanz als schnelle Vorab-Ablehnung, dann die echte Pfadsuche
+      if (d > 0 && d <= sel.movesLeft && findSmartPath(sel.x, sel.y, x, y, sel.team, sel.movesLeft)) {
+        setPreview(previewMovePreview(sel, x, y));
+        return;
+      }
+    }
+  }
+
+  setPreview('Fahre mit der Maus über ein Feld oder einen Spieler, um die Erfolgschancen zu sehen.');
+}
+
+/* ============================================================
+   INPUT-HANDLING
+   ============================================================ */
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) / CELL);
+  const y = Math.floor((e.clientY - rect.top) / CELL);
+  if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return;
+  updateHoverPreview(x, y);
+});
+canvas.addEventListener('mouseleave', () => {
+  setPreview('Fahre mit der Maus über ein Feld oder einen Spieler, um die Erfolgschancen zu sehen.');
+});
+
+canvas.addEventListener('click', (e) => {
+  if (gameEnded || currentTeam !== TEAM_BLUE) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) / CELL);
+  const y = Math.floor((e.clientY - rect.top) / CELL);
+
+  const clicked = playerAt(x, y);
+  const sel = players.find(p => p.id === selectedPlayerId);
+
+  // Pass-Zielwahl hat Vorrang, wenn sie aktiv ist
+  if (passMode) {
+    passMode = false;
+    if (clicked && clicked.team === TEAM_BLUE && !clicked.prone && sel) {
+      attemptPass(sel, clicked);
+      updateActionButtons(sel);
+    } else if (clicked && clicked.prone) {
+      setStatus('Passversuch abgebrochen – ein liegender Spieler kann nicht fangen.');
+    } else {
+      setStatus('Passversuch abgebrochen – kein Mitspieler angeklickt.');
+    }
+    draw();
+    return;
+  }
+
+  if (!sel) {
+    if (clicked && clicked.team === TEAM_BLUE && !clicked.injured) {
+      standUpIfNeeded(clicked);
+      selectedPlayerId = clicked.id;
+      setStatus(`Spieler ${clicked.number} ausgewählt (Bewegung übrig: ${clicked.movesLeft}).`);
+      updateActionButtons(clicked);
+    }
+    draw();
+    return;
+  }
+
+  // Eigenen anderen Spieler auswählen
+  if (clicked && clicked.team === TEAM_BLUE) {
+    standUpIfNeeded(clicked);
+    selectedPlayerId = clicked.id;
+    setStatus(`Spieler ${clicked.number} ausgewählt (Bewegung übrig: ${clicked.movesLeft}).`);
+    updateActionButtons(clicked);
+    draw();
+    return;
+  }
+
+  // Gegner anklicken -> Block, falls adjazent
+  if (clicked && clicked.team === TEAM_RED) {
+    if (isAdjacent(sel, clicked) && !sel.acted) {
+      resolveBlock(sel, clicked);
+    } else {
+      setStatus('Dieser Gegner ist nicht direkt neben deinem Spieler.');
+    }
+    return;
+  }
+
+  // Leeres Feld -> bewegen, falls erreichbar
+  if (!clicked) {
+    const dist = chebyshev(sel.x, sel.y, x, y);
+    if (dist > 0 && dist <= sel.movesLeft) {
+      movePlayer(sel, x, y);
+    }
+  }
+});
+
+document.getElementById('btn-block').addEventListener('click', () => {
+  const sel = players.find(p => p.id === selectedPlayerId);
+  if (!sel) return;
+  const enemy = players.find(e => e.team === TEAM_RED && !e.prone && !e.injured && isAdjacent(sel, e));
+  if (enemy) { resolveBlock(sel, enemy); if (currentTeam === TEAM_BLUE) updateActionButtons(sel); }
+});
+
+document.getElementById('btn-pass').addEventListener('click', () => {
+  const sel = players.find(p => p.id === selectedPlayerId);
+  if (!sel || ball.carrierId !== sel.id || sel.acted) return;
+  passMode = true;
+  setStatus('Pass-Modus: Klicke einen Mitspieler an, um ihn anzuspielen.');
+});
+
+document.getElementById('btn-endturn').addEventListener('click', () => endTurn(false));
+
+/* ============================================================
+   ANSTOSS-WURF (nur zu Spielbeginn – nach Touchdowns bleibt die
+   bestehende Regelung über endTurn() unverändert)
+   ============================================================ */
+// Beide Teams würfeln je einen W10, der höhere Wurf beginnt das Spiel.
+// Bei Gleichstand wird wiederholt.
+function rollForFirstTurn() {
+  const attempts = [];
+  let blueRoll, redRoll;
+  do {
+    blueRoll = rollD10();
+    redRoll = rollD10();
+    attempts.push({ blueRoll, redRoll });
+  } while (blueRoll === redRoll);
+
+  const winner = blueRoll > redRoll ? TEAM_BLUE : TEAM_RED;
+  logAction(`Anstoß-Wurf – ${teams[winner].name} beginnt das Spiel!`, '🎲', winner);
+  attempts.forEach((a, i) => {
+    const tieNote = (i < attempts.length - 1) ? ' – Gleichstand, wird wiederholt' : '';
+    log(`${teams[TEAM_BLUE].name} würfelt ${a.blueRoll}, ${teams[TEAM_RED].name} würfelt ${a.redRoll}${tieNote}`);
+  });
+  return winner;
+}
+
+/* ============================================================
+   START
+   ============================================================ */
+setupTeams();
+startKickoff();
+updateScoreboard();
+currentTeam = rollForFirstTurn();
+draw();
+
+if (currentTeam === TEAM_RED) {
+  setStatus('Rot (KI) beginnt das Spiel...');
+  setTimeout(aiTurn, 700);
+} else {
+  setStatus('Du beginnst das Spiel – wähle einen Spieler.');
+}
+</script>
+</body>
+</html>
