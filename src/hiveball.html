@@ -184,6 +184,8 @@
       <br><br>
       <b>Tacklezonen:</b> Jeder stehende Spieler kontrolliert die 8 Felder um sich herum (dezent farbig markiert). Fangen, Werfen und Ballaufnahme werden pro gegnerischer Tacklezone, in der man sich befindet, um 1 erschwert.
       <br><br>
+      <b>Unterstützung beim Block:</b> Teamkameraden des Blockers, die in der Tacklezone des Geblockten stehen (aber selbst in keiner weiteren gegnerischen Tacklezone), addieren die Hälfte ihres BL-Werts (abgerundet) zum Blockwurf. Umgekehrt gilt dasselbe für Teamkameraden des Geblockten, die in der Tacklezone des Blockers stehen.
+      <br><br>
       <b>Tackle:</b> Bewegt sich ein Spieler (der <b>Dodger</b>) aus dem Feld eines Gegners (dem <b>Tackler</b>) heraus, darf der Tackler tackeln: BL gegen AG des Dodgers. Bleibt der Dodger dabei in der Tacklezone desselben Tacklers, erhält dieser +1 auf seinen Wurf. Gewinnt der Tackler, fällt der Dodger an seiner Ausgangsposition um (inkl. Verletzungscheck), die Bewegung wird abgebrochen. Würfelt der Tackler dabei eine natürliche 1, verreißt er den Tackle und stürzt selbst (ebenfalls mit Verletzungsrisiko).
       <br><br>
       <b>Positionen:</b> Jedes Team besteht aus 2× 🛡️ Blocker, 1× 🎯 Werfer, 1× 🙌 Fänger, 1× 🏃 Läufer – erkennbar am Icon auf dem Spieler. Die kleine Zahl im Kreis unten rechts ist die Trikotnummer (1–5, pro Team eigenständig vergeben).
@@ -314,6 +316,33 @@ function countEnemyTackleZones(x, y, team) {
 }
 function isAdjacent(a, b) {
   return chebyshev(a.x, a.y, b.x, b.y) === 1;
+}
+
+// Ermittelt, welche Teamkameraden von 'supporter' dessen Wurf gegen 'target' unterstützen
+// (z.B. beim Block: supporter = Blocker, target = Geblockter, oder umgekehrt).
+// Ein Teamkamerad unterstützt, wenn er selbst in der Tacklezone von 'target' steht,
+// ABER kein anderer Spieler aus dem Team von 'target' (außer target selbst) ihn seinerseits
+// in dessen eigener Tacklezone hat – eine fremde Tacklezone (außer die von target) negiert
+// die Unterstützung.
+function getBlockAssists(supporter, target) {
+  return players.filter(p =>
+    p.team === supporter.team &&
+    p.id !== supporter.id &&
+    !p.prone && !p.injured &&
+    chebyshev(p.x, p.y, target.x, target.y) === 1 &&
+    !players.some(o =>
+      o.team === target.team &&
+      o.id !== target.id &&
+      !o.prone && !o.injured &&
+      chebyshev(o.x, o.y, p.x, p.y) === 1
+    )
+  );
+}
+
+// Wandelt eine Liste unterstützender Spieler in Wurf-Teile um: jeder Unterstützer trägt
+// die Hälfte seines BL-Werts (abgerundet) zum Wurf bei.
+function assistParts(assists) {
+  return assists.map(p => ({ label: `Unterstützung #${p.number}`, value: Math.floor(p.bl / 2) }));
 }
 
 // Sucht den besten Bewegungspfad von (x1,y1) nach (x2,y2) über das Raster (8 Richtungen).
@@ -930,10 +959,24 @@ function scatterBallNear(x, y) {
 function resolveBlock(attacker, defender) {
   logAction(`Block: ${teams[attacker.team].name} #${attacker.number} vs ${teams[defender.team].name} #${defender.number}`, '🛡️', attacker.team);
 
-  // 1) BL-Duell entscheidet, wer umfällt
+  // 0) Unterstützung ermitteln: Teamkameraden, die in der Tacklezone des jeweiligen
+  // Gegenspielers stehen, aber selbst in keiner (weiteren) gegnerischen Tacklezone,
+  // fügen die Hälfte ihres BL-Werts (abgerundet) zum Wurf ihres Kameraden hinzu.
+  const attackerAssists = getBlockAssists(attacker, defender);
+  const defenderAssists = getBlockAssists(defender, attacker);
+  if (attackerAssists.length) {
+    log(`Unterstützung für ${teams[attacker.team].name} #${attacker.number}: ` +
+      attackerAssists.map(p => `#${p.number} (+${Math.floor(p.bl / 2)})`).join(', '));
+  }
+  if (defenderAssists.length) {
+    log(`Unterstützung für ${teams[defender.team].name} #${defender.number}: ` +
+      defenderAssists.map(p => `#${p.number} (+${Math.floor(p.bl / 2)})`).join(', '));
+  }
+
+  // 1) BL-Duell entscheidet, wer umfällt (inkl. Unterstützungsboni)
   const blockResult = rollOpposed(
-    [{ label: 'BL', value: attacker.bl }],
-    [{ label: 'BL', value: defender.bl }]
+    [{ label: 'BL', value: attacker.bl }, ...assistParts(attackerAssists)],
+    [{ label: 'BL', value: defender.bl }, ...assistParts(defenderAssists)]
   );
   log(`BL-Duell – ${teams[attacker.team].name} #${attacker.number}: ${blockResult.descA}  vs  ${teams[defender.team].name} #${defender.number}: ${blockResult.descB}${blockResult.note}`);
 
@@ -1122,7 +1165,11 @@ function findBestBlockOption(p) {
 
   let best = null;
   adjEnemies.forEach(e => {
-    const blockChance = opposedChance(p.bl, e.bl);
+    // Unterstützungsboni mit einrechnen, sonst würde die KI Blocks falsch einschätzen,
+    // sobald Teamkameraden mit unterstützen (siehe getBlockAssists/resolveBlock).
+    const bonusP = getBlockAssists(p, e).reduce((s, a) => s + Math.floor(a.bl / 2), 0);
+    const bonusE = getBlockAssists(e, p).reduce((s, a) => s + Math.floor(a.bl / 2), 0);
+    const blockChance = opposedChance(p.bl + bonusP, e.bl + bonusE);
     if (!best || blockChance > best.blockChance) best = { enemy: e, blockChance };
   });
   return best;
@@ -1311,12 +1358,28 @@ function previewMovePreview(dodger, destX, destY) {
 }
 
 function previewBlockPreview(attacker, defender) {
-  const diff = attacker.bl - defender.bl;
-  const chanceA = opposedChance(attacker.bl, defender.bl);
-  return `<b>🛡️ Block</b><br>` +
-    `BL #${attacker.number} ${attacker.bl}  vs  BL #${defender.number} ${defender.bl}  (Differenz ${diff >= 0 ? '+' : ''}${diff})<br>` +
-    `Erfolg #${attacker.number}: ${chanceSpan(chanceA)} · Erfolg #${defender.number}: ${chanceSpan(1 - chanceA)}` +
+  const attackerAssists = getBlockAssists(attacker, defender);
+  const defenderAssists = getBlockAssists(defender, attacker);
+  const bonusA = attackerAssists.reduce((s, p) => s + Math.floor(p.bl / 2), 0);
+  const bonusB = defenderAssists.reduce((s, p) => s + Math.floor(p.bl / 2), 0);
+  const totalA = attacker.bl + bonusA;
+  const totalB = defender.bl + bonusB;
+  const diff = totalA - totalB;
+  const chanceA = opposedChance(totalA, totalB);
+
+  let html = `<b>🛡️ Block</b><br>` +
+    `BL #${attacker.number} ${attacker.bl}${bonusA ? ' + ' + bonusA + ' Unterst.' : ''} = ${totalA}  vs  ` +
+    `BL #${defender.number} ${defender.bl}${bonusB ? ' + ' + bonusB + ' Unterst.' : ''} = ${totalB}  ` +
+    `(Differenz ${diff >= 0 ? '+' : ''}${diff})<br>`;
+  if (attackerAssists.length) {
+    html += `Unterstützer #${attacker.number}: ${attackerAssists.map(p => '#' + p.number + ' (+' + Math.floor(p.bl / 2) + ')').join(', ')}<br>`;
+  }
+  if (defenderAssists.length) {
+    html += `Unterstützer #${defender.number}: ${defenderAssists.map(p => '#' + p.number + ' (+' + Math.floor(p.bl / 2) + ')').join(', ')}<br>`;
+  }
+  html += `Erfolg #${attacker.number}: ${chanceSpan(chanceA)} · Erfolg #${defender.number}: ${chanceSpan(1 - chanceA)}` +
     `<br><small>(Näherung, ohne Krit-10/Krit-1)</small>`;
+  return html;
 }
 
 function previewPassPreview(passer, receiver) {

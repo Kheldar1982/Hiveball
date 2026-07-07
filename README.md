@@ -105,6 +105,25 @@ heraus, darf der Tackler tackeln: BL des Tacklers gegen AG des Dodgers.
 - Ein Sturz mit Ballverlust ist immer ein Turnover; ein Sturz ohne Ball
   beendet den Zug nicht.
 
+## 7a. Block & Unterstützung (Assists)
+
+Aktive Aktion gegen einen angrenzenden, stehenden Gegner (`resolveBlock`). BL-Duell,
+Verlierer fällt um + Verletzungscheck (ST Gewinner vs. CO Verlierer). Zählt als die
+eine erlaubte Aktion des Zuges (`acted`-Flag).
+
+**Unterstützung beim Block:** Teamkameraden des Blockers, die in der Tacklezone
+des Geblockten stehen (aber selbst in keiner *weiteren* gegnerischen
+Tacklezone), addieren die Hälfte ihres BL-Werts (abgerundet, `Math.floor`)
+zum Blockwurf ihres Kameraden (`getBlockAssists` / `assistParts`). Umgekehrt
+gilt dasselbe für Teamkameraden des Geblockten. Beide Seiten können also
+gleichzeitig Unterstützung erhalten. Fließt konsistent in drei Stellen ein:
+
+- `resolveBlock` – der eigentliche Wurf inkl. Log-Zeile, wer wen unterstützt.
+- `previewBlockPreview` – die Hover-Vorschau zeigt Unterstützer und die
+  korrigierte Erfolgschance.
+- `findBestBlockOption` – die KI rechnet Unterstützung mit ein, wenn sie
+  entscheidet, ob Blocken einer riskanten Bewegung vorzuziehen ist.
+
 ## 8. Pass & Fangen
 
 - Reichweite und Schwierigkeit basieren auf derselben Metrik: der
