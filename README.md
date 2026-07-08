@@ -53,20 +53,24 @@ lokalem Server ausliefern) – kein `npm install`, kein Build-Schritt nötig.
 
 ## 4. Attribute & Positionswerte
 
-CO ist bewusst um `TEMP_CO_BONUS = 3` erhöht (temporärer Ausgleich, bis es
-ein Ausrüstungssystem gibt). Die übrigen Werte summieren sich je Position auf
-20 (BL+ST+CO+AG+PA ohne den Bonus), MR steht separat außerhalb dieses
-Budgets.
+Die Grundwerte summieren sich je Position auf 20 (BL+ST+CO+AG+PA), MR steht
+separat außerhalb dieses Budgets. RW und SP werden aus CO abgeleitet:
+`RW = CO + ARMOR_BONUS (3)`, `SP = CO * STAMINA_MULTIPLIER (3)` (Wert zu
+Spielbeginn). Der frühere pauschale `TEMP_CO_BONUS` auf CO selbst entfällt
+damit – die Rüstungsfunktion, für die er ursprünglich als Provisorium diente,
+übernimmt jetzt RW.
 
-| Position | Icon | MR | BL | ST | CO (inkl. Bonus) | AG | PA |
-|----------|------|----|----|----|-------------------|----|----|
-| Blocker  | 🛡️  | 4  | 5  | 5  | 8                 | 2  | 3  |
-| Läufer   | 🏃  | 6  | 3  | 3  | 6                 | 6  | 5  |
-| Fänger   | 🙌  | 6  | 2  | 2  | 6                 | 7  | 6  |
-| Werfer   | 🎯  | 5  | 3  | 3  | 7                 | 4  | 6  |
+| Position | Icon | MR | BL | ST | CO | RW | SP | AG | PA |
+|----------|------|----|----|----|----|----|----|----|----|
+| Blocker  | 🛡️  | 4  | 5  | 5  | 5  | 8  | 15 | 2  | 3  |
+| Läufer   | 🏃  | 6  | 3  | 3  | 3  | 6  | 9  | 6  | 5  |
+| Fänger   | 🙌  | 6  | 2  | 2  | 3  | 6  | 9  | 7  | 6  |
+| Werfer   | 🎯  | 5  | 3  | 3  | 4  | 7  | 12 | 4  | 6  |
 
-- **MR** = Movement Range · **BL** = Block-Duell · **ST vs CO** =
-  Verletzungscheck nach verlorenem Block · **AG** = Ballaufnahme/Fangen ·
+- **MR** = Movement Range · **BL** = Block-Duell · **CO** = Konstitution
+  (Basis für RW/SP) · **RW** = Rüstungswert, Ziel des Verletzungswurfs
+  (`CO + 3`) · **SP** = Stamina Points, werden beim Verletzungscheck
+  verbraucht (`CO * 3` zu Spielbeginn) · **AG** = Ballaufnahme/Fangen ·
   **PA** = Pass-Genauigkeit.
 - Team-Zusammensetzung "Option A": 2 Blocker, 1 Läufer, 1 Fänger, 1 Werfer.
 - Aufstehen aus der Bodenlage kostet `STAND_UP_COST = 2` Bewegungspunkte
@@ -80,8 +84,11 @@ Budgets.
   Sieg), eine gewürfelte **1** immer ein Misserfolg (bei Duellen: automatische
   Niederlage) – unabhängig vom Zielwert bzw. den Werten des Gegners.
 - Zielwert-Würfe: `W10 + Attribut + Modifikatoren >= Basiszielwert + Zielwert-Modifikatoren`.
-- Opposed-Würfe (Block, Verletzungscheck, Tackle): höhere Summe gewinnt,
-  Krit-10/Krit-1-Sonderregel hat Vorrang.
+- Opposed-Würfe (Block, Tackle): höhere Summe gewinnt, Krit-10/Krit-1-Sonderregel
+  hat Vorrang.
+- Verletzungscheck (kein Opposed-Wurf, siehe Abschnitt 7b): Gewinner wirft
+  `W10 + ST`, die Differenz zum RW des Verlierers wird von dessen SP
+  abgezogen.
 
 ## 6. Tacklezonen
 
@@ -97,19 +104,19 @@ heraus, darf der Tackler tackeln: BL des Tacklers gegen AG des Dodgers.
 - Bleibt der Dodger dabei in der Tacklezone desselben Tacklers, erhält
   dieser +1 auf seinen Wurf.
 - Gewinnt der Tackler, fällt der Dodger an seiner Ausgangsposition um
-  (inkl. Verletzungscheck: ST des Tacklers vs. CO des Dodgers), die
-  Bewegung wird abgebrochen.
+  (inkl. Verletzungscheck, siehe 7b: Tackler gegen Dodger), die Bewegung
+  wird abgebrochen.
 - Würfelt der Tackler dabei eine natürliche 1, verreißt er den Tackle und
-  stürzt selbst (ebenfalls mit eigenem Verletzungsrisiko: CO gegen sich
-  selbst geworfen).
+  stürzt selbst (ebenfalls mit eigenem Verletzungsrisiko: Verletzungscheck
+  gegen sich selbst, eigene ST gegen eigene RW/SP).
 - Ein Sturz mit Ballverlust ist immer ein Turnover; ein Sturz ohne Ball
   beendet den Zug nicht.
 
 ## 7a. Block & Unterstützung (Assists)
 
 Aktive Aktion gegen einen angrenzenden, stehenden Gegner (`resolveBlock`). BL-Duell,
-Verlierer fällt um + Verletzungscheck (ST Gewinner vs. CO Verlierer). Zählt als die
-eine erlaubte Aktion des Zuges (`acted`-Flag).
+Verlierer fällt um + Verletzungscheck (siehe 7b: Gewinner gegen Verlierer). Zählt
+als die eine erlaubte Aktion des Zuges (`acted`-Flag).
 
 **Unterstützung beim Block:** Teamkameraden des Blockers, die in der Tacklezone
 des Geblockten stehen (aber selbst in keiner *weiteren* gegnerischen
@@ -123,6 +130,26 @@ gleichzeitig Unterstützung erhalten. Fließt konsistent in drei Stellen ein:
   korrigierte Erfolgschance.
 - `findBestBlockOption` – die KI rechnet Unterstützung mit ein, wenn sie
   entscheidet, ob Blocken einer riskanten Bewegung vorzuziehen ist.
+
+## 7b. Verletzungscheck (RW & SP)
+
+Ausgelöst nach jedem verlorenen Block und jedem verlorenen Tackle
+(`resolveInjuryCheck(winner, loser)`), sowie beim Selbst-Sturz eines
+Tacklers, der eine natürliche 1 würfelt (dort ist Gewinner = Verlierer =
+der stürzende Tackler selbst).
+
+- Gewinner wirft `W10 + eigene ST`.
+- Davon wird der RW (Rüstungswert) des Verlierers abgezogen; ist das
+  Ergebnis negativ, richtet der Treffer keinen Schaden an (`Math.max(0, …)`).
+- Die verbleibende Differenz wird von den SP (Stamina Points) des
+  Verlierers abgezogen.
+- Fallen die SP eines Spielers dabei auf 0 oder darunter, ist er
+  **verletzt** und scheidet endgültig aus. Bleiben SP > 0, liegt er nur
+  **am Boden** und steht regulär wieder auf.
+- Kein Opposed-Wurf – der Verlierer würfelt hier selbst nicht mit, es gibt
+  daher keine Krit-10/Krit-1-Sonderregel auf dieser Seite.
+- SP werden nur durch diesen Check verringert; es gibt (noch) keine
+  Regeneration oder sonstigen Verbrauch.
 
 ## 8. Pass & Fangen
 
@@ -185,6 +212,9 @@ schwerer als normal.
 - **Vorschau-Feld** (Hover): zeigt vor der Aktion Zielwerte/benötigte Würfe
   (Pass, Ballaufnahme) bzw. Erfolgswahrscheinlichkeiten (Block, Tackle-Risiko
   pro Bewegungsschritt) – nutzt dieselbe Pfadsuche wie die echte Bewegung.
+- **SP-Anzeige:** kleines rotes Herz unten links an jedem Spieler-Icon
+  (spiegelbildlich zum Nummern-Badge unten rechts), zeigt die aktuellen
+  Stamina Points (`drawHeart`).
 
 ## Offene Punkte / Nächste Schritte
 
@@ -194,8 +224,9 @@ schwerer als normal.
 - Keine Persistenz/Speicherung – Spielstand geht bei Neuladen verloren.
   Relevant, sobald ein Manager-Teil mit Kader über mehrere Spiele hinweg
   existieren soll.
-- `TEMP_CO_BONUS` ist explizit als Provisorium markiert, bis es ein
-  Ausrüstungssystem gibt.
+- RW und SP fließen in den Verletzungscheck ein (siehe 7b), haben aber
+  sonst noch keine weitere Spielmechanik – kein Regenerations- oder
+  Erschöpfungssystem für SP jenseits des Verletzungschecks.
 - KI wirft nicht selbst (keine Pass-Entscheidungslogik für Rot).
 
 ## Projektstruktur

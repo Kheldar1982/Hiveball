@@ -226,17 +226,20 @@ let gameEnded = false;
 /* ============================================================
    POSITIONEN
    ============================================================ */
-// CO ist bewusst um TEMP_CO_BONUS erhöht (temporärer Ausgleich, bis es ein
-// Ausrüstungssystem gibt). Die restlichen Werte summieren sich je Position auf 20
-// (BL+ST+CO+AG+PA), MR steht separat außerhalb dieses Budgets.
-const TEMP_CO_BONUS = 3;
-
+// Die Werte summieren sich je Position auf 20 (BL+ST+CO+AG+PA), MR steht
+// separat außerhalb dieses Budgets. RW (Rüstungswert) und SP (Stamina Points)
+// werden aus CO abgeleitet, siehe ARMOR_BONUS / STAMINA_MULTIPLIER unten.
 const POSITIONS = {
-  Blocker: { icon: '🛡️', mr: 4, bl: 5, st: 5, co: 5 + TEMP_CO_BONUS, ag: 2, pa: 3 },
-  Läufer:  { icon: '🏃', mr: 6, bl: 3, st: 3, co: 3 + TEMP_CO_BONUS, ag: 6, pa: 5 },
-  Fänger:  { icon: '🙌', mr: 6, bl: 2, st: 2, co: 3 + TEMP_CO_BONUS, ag: 7, pa: 6 },
-  Werfer:  { icon: '🎯', mr: 5, bl: 3, st: 3, co: 4 + TEMP_CO_BONUS, ag: 4, pa: 6 },
+  Blocker: { icon: '🛡️', mr: 4, bl: 5, st: 5, co: 5, ag: 2, pa: 3 },
+  Läufer:  { icon: '🏃', mr: 6, bl: 3, st: 3, co: 3, ag: 6, pa: 5 },
+  Fänger:  { icon: '🙌', mr: 6, bl: 2, st: 2, co: 3, ag: 7, pa: 6 },
+  Werfer:  { icon: '🎯', mr: 5, bl: 3, st: 3, co: 4, ag: 4, pa: 6 },
 };
+
+// RW = CO + ARMOR_BONUS (ersetzt den früheren pauschalen CO-Bonus).
+const ARMOR_BONUS = 3;
+// SP zu Spielbeginn = CO * STAMINA_MULTIPLIER.
+const STAMINA_MULTIPLIER = 3;
 
 // Team-Zusammensetzung "Option A": 2 Blocker, 1 Läufer, 1 Fänger, 1 Werfer
 const TEAM_ROSTER = ['Blocker', 'Blocker', 'Werfer', 'Fänger', 'Läufer'];
@@ -263,6 +266,8 @@ function createPlayer(id, number, team, position, x, y) {
     co: stats.co,
     ag: stats.ag,
     pa: stats.pa,
+    rw: stats.co + ARMOR_BONUS,
+    sp: stats.co * STAMINA_MULTIPLIER,
     prone: false,
     injured: false,
     acted: false
@@ -475,6 +480,21 @@ function rollOpposed(partsA, partsB) {
 
   return { rawA, rawB, totalA, totalB, winner, note, descA, descB };
 }
+// Verletzungscheck: Gewinner wirft W10 + eigene ST. Übersteigt das den RW des
+// Verlierers, wird die Differenz von dessen SP abgezogen. Fällt SP dabei auf
+// 0 oder darunter, ist der Verlierer verletzt – sonst bleibt er nur am Boden.
+function resolveInjuryCheck(winner, loser) {
+  const raw = rollD10();
+  const total = raw + winner.st;
+  const damage = Math.max(0, total - loser.rw);
+  const spBefore = loser.sp;
+  loser.sp -= damage;
+  const injured = loser.sp <= 0;
+  const desc = `W10: ${raw} + ST ${winner.st} = ${total}  vs RW ${loser.rw}  →  ` +
+    `${damage} Schaden auf SP (${spBefore} → ${loser.sp})`;
+  return { raw, total, damage, spBefore, spAfter: loser.sp, injured, desc };
+}
+
 let currentLogTeamClass = ''; // Team-Farbe der aktuell laufenden Log-Aktion
 
 // Startet eine neue "Aktion" im Log (z.B. Zug, Block, Pass, Tackle) mit eigener
@@ -615,6 +635,9 @@ function draw() {
     ctx.font = 'bold ' + (CELL * 0.2) + 'px sans-serif';
     ctx.fillText(p.number, bx, by + 1);
 
+    // Stamina Points (SP) als kleines rotes Herz unten links
+    drawHeart(cx - CELL * 0.22, cy + CELL * 0.22, CELL * 0.32, p.sp);
+
     if (p.prone) {
       ctx.font = '10px sans-serif';
       ctx.fillStyle = '#ffdddd';
@@ -626,6 +649,31 @@ function draw() {
       drawBall(cx - CELL * 0.28, cy - CELL * 0.28);
     }
   });
+}
+
+// Zeichnet ein kleines rotes Herz mit zentrierter Zahl (SP-Anzeige) um (cx, cy).
+function drawHeart(cx, cy, size, sp) {
+  const w = size, h = size;
+  const topY = cy - h * 0.35;
+  const topCurve = h * 0.28;
+  ctx.beginPath();
+  ctx.moveTo(cx, topY + topCurve);
+  ctx.bezierCurveTo(cx, topY, cx - w / 2, topY, cx - w / 2, topY + topCurve);
+  ctx.bezierCurveTo(cx - w / 2, topY + (h + topCurve) / 2, cx, topY + (h + topCurve) / 2, cx, topY + h);
+  ctx.bezierCurveTo(cx, topY + (h + topCurve) / 2, cx + w / 2, topY + (h + topCurve) / 2, cx + w / 2, topY + topCurve);
+  ctx.bezierCurveTo(cx + w / 2, topY, cx, topY, cx, topY + topCurve);
+  ctx.closePath();
+  ctx.fillStyle = '#e11d2e';
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = '#0b0f14';
+  ctx.stroke();
+
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold ' + (size * 0.42) + 'px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(sp, cx, cy + size * 0.06);
 }
 
 function drawBall(x, y) {
@@ -724,9 +772,9 @@ function attemptLeavingTackleZones(dodger, destX, destY) {
     if (r.rawA === 1) {
       tackler.prone = true;
       log(`${teams[tackler.team].name} #${tackler.number} verreißt den Tackle und stürzt selbst!`);
-      const selfFall = rollOpposed([], [{ label: 'CO', value: tackler.co }]);
-      log(`Sturz-Verletzungscheck – ${teams[tackler.team].name} #${tackler.number}: ${selfFall.descA}  vs eigene CO: ${selfFall.descB}${selfFall.note}`);
-      if (selfFall.winner === 'A') {
+      const selfFall = resolveInjuryCheck(tackler, tackler);
+      log(`Sturz-Verletzungscheck – ${teams[tackler.team].name} #${tackler.number}: ${selfFall.desc}`);
+      if (selfFall.injured) {
         tackler.injured = true;
         setStatus(`Spieler ${tackler.number} stürzt beim verpatzten Tackle und verletzt sich!`);
         log(`🚑 Spieler ${tackler.number} (${teams[tackler.team].name}) ist verletzt und verlässt das Feld.`);
@@ -742,9 +790,9 @@ function attemptLeavingTackleZones(dodger, destX, destY) {
         scatterBallNear(startX, startY);
         ballDropped = true;
       }
-      const inj = rollOpposed([{ label: 'ST', value: tackler.st }], [{ label: 'CO', value: dodger.co }]);
-      log(`Verletzungscheck – ${teams[tackler.team].name} #${tackler.number}: ${inj.descA}  vs  ${teams[dodger.team].name} #${dodger.number}: ${inj.descB}${inj.note}`);
-      if (inj.winner === 'A') {
+      const inj = resolveInjuryCheck(tackler, dodger);
+      log(`Verletzungscheck – ${teams[tackler.team].name} #${tackler.number}: ${inj.desc}`);
+      if (inj.injured) {
         dodger.injured = true;
         setStatus(`Spieler ${dodger.number} wird beim Tackle verletzt!`);
         log(`🚑 Spieler ${dodger.number} (${teams[dodger.team].name}) ist verletzt und verlässt das Feld.`);
@@ -1000,15 +1048,11 @@ function resolveBlock(attacker, defender) {
     ballDropped = true;
   }
 
-  // 2) Verletzungscheck: ST des Gewinners vs. CO des Verlierers
-  const injuryResult = rollOpposed(
-    [{ label: 'ST', value: winner.st }],
-    [{ label: 'CO', value: loser.co }]
-  );
-  const winnerBeatsLoser = injuryResult.winner === 'A'; // A = winner (ST), B = loser (CO)
-  log(`Verletzungscheck – ${teams[winner.team].name} #${winner.number}: ${injuryResult.descA}  vs  ${teams[loser.team].name} #${loser.number}: ${injuryResult.descB}${injuryResult.note}`);
+  // 2) Verletzungscheck: W10 + ST des Gewinners vs. RW des Verlierers, Differenz kostet SP
+  const injuryResult = resolveInjuryCheck(winner, loser);
+  log(`Verletzungscheck – ${teams[winner.team].name} #${winner.number}: ${injuryResult.desc}`);
 
-  if (winnerBeatsLoser) {
+  if (injuryResult.injured) {
     loser.injured = true;
     setStatus(`Spieler ${loser.number} ist verletzt und scheidet aus!`);
     log(`🚑 Spieler ${loser.number} (${teams[loser.team].name}) ist verletzt und verlässt das Feld.`);
