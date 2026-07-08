@@ -232,7 +232,7 @@ let gameEnded = false;
 // skills: Positions-Startskills, die jeder Spieler dieser Position von Beginn an hat
 // (siehe SKILLS unten für die Effekte der einzelnen Skills).
 const POSITIONS = {
-  Blocker: { icon: '🛡️', mr: 4, bl: 5, st: 5, co: 5, ag: 2, pa: 3, skills: [] },
+  Blocker: { icon: '🛡️', mr: 4, bl: 5, st: 5, co: 5, ag: 2, pa: 3, skills: ['Block'] },
   Läufer:  { icon: '🏃', mr: 6, bl: 3, st: 3, co: 3, ag: 6, pa: 5, skills: ['Blitz'] },
   Fänger:  { icon: '🙌', mr: 6, bl: 2, st: 2, co: 3, ag: 7, pa: 6, skills: [] },
   Werfer:  { icon: '🎯', mr: 5, bl: 3, st: 3, co: 4, ag: 4, pa: 6, skills: [] },
@@ -240,9 +240,12 @@ const POSITIONS = {
 
 // Bekannte Skills und ihre Kurzbeschreibung (rein informativ, die eigentliche
 // Wirkung ist an der jeweiligen Stelle im Code implementiert, z.B. Blitz in
-// movementBlockPenalty).
+// movementBlockPenalty, Block in resolveBlock/previewBlockPreview/findBestBlockOption).
 const SKILLS = {
   Blitz: 'Kein Bewegungsabzug beim Blocken, auch nach genutzten MR.',
+  Block: 'Beim Blocken (nicht beim Tackeln) +1 auf den Blockwurf, für Blocker ' +
+    'und Geblockten. Hat nur einer von beiden diesen Skill, gewinnt er den ' +
+    'Block auch bei Gleichstand automatisch.',
 };
 
 // RW = CO + ARMOR_BONUS (ersetzt den früheren pauschalen CO-Bonus).
@@ -1048,21 +1051,32 @@ function resolveBlock(attacker, defender) {
       defenderAssists.map(p => `#${p.number} (+${Math.floor(p.bl / 2)})`).join(', '));
   }
 
-  // 1) BL-Duell entscheidet, wer umfällt (inkl. Unterstützungsboni und Bewegungsabzug)
+  // 1) BL-Duell entscheidet, wer umfällt (inkl. Unterstützungsboni, Bewegungsabzug
+  // und dem Block-Skill – dieser gilt nur beim Blocken, nicht beim Tackeln).
   const movePenalty = movementBlockPenalty(attacker);
   if (attacker.mr !== attacker.movesLeft && hasSkill(attacker, 'Blitz')) {
     log(`${teams[attacker.team].name} #${attacker.number} nutzt Blitz: kein Bewegungsabzug trotz genutzter MR.`);
   }
+  const attackerHasBlockSkill = hasSkill(attacker, 'Block');
+  const defenderHasBlockSkill = hasSkill(defender, 'Block');
   const blockResult = rollOpposed(
     [{ label: 'BL', value: attacker.bl }, ...assistParts(attackerAssists),
-      ...(movePenalty ? [{ label: 'Bewegungsabzug', value: -movePenalty }] : [])],
-    [{ label: 'BL', value: defender.bl }, ...assistParts(defenderAssists)]
+      ...(movePenalty ? [{ label: 'Bewegungsabzug', value: -movePenalty }] : []),
+      ...(attackerHasBlockSkill ? [{ label: 'Block-Skill', value: 1 }] : [])],
+    [{ label: 'BL', value: defender.bl }, ...assistParts(defenderAssists),
+      ...(defenderHasBlockSkill ? [{ label: 'Block-Skill', value: 1 }] : [])]
   );
   log(`BL-Duell – ${teams[attacker.team].name} #${attacker.number}: ${blockResult.descA}  vs  ${teams[defender.team].name} #${defender.number}: ${blockResult.descB}${blockResult.note}`);
 
   let winner = null, loser = null;
   if (blockResult.winner === 'A') { winner = attacker; loser = defender; }
   else if (blockResult.winner === 'B') { winner = defender; loser = attacker; }
+  else if (attackerHasBlockSkill !== defenderHasBlockSkill) {
+    // Gleichstand, aber nur einer von beiden hat den Block-Skill: der gewinnt automatisch.
+    if (attackerHasBlockSkill) { winner = attacker; loser = defender; }
+    else { winner = defender; loser = attacker; }
+    log(`Gleichstand – ${teams[winner.team].name} #${winner.number} gewinnt automatisch durch den Skill Block.`);
+  }
 
   if (!winner) {
     setStatus('Unentschieden – beide bleiben stehen.');
@@ -1245,7 +1259,10 @@ function findBestBlockOption(p) {
     // sobald Teamkameraden mit unterstützen (siehe getBlockAssists/resolveBlock).
     const bonusP = getBlockAssists(p, e).reduce((s, a) => s + Math.floor(a.bl / 2), 0);
     const bonusE = getBlockAssists(e, p).reduce((s, a) => s + Math.floor(a.bl / 2), 0);
-    const blockChance = opposedChance(p.bl + bonusP - movementBlockPenalty(p), e.bl + bonusE);
+    const blockChance = opposedChance(
+      p.bl + bonusP - movementBlockPenalty(p) + (hasSkill(p, 'Block') ? 1 : 0),
+      e.bl + bonusE + (hasSkill(e, 'Block') ? 1 : 0)
+    );
     if (!best || blockChance > best.blockChance) best = { enemy: e, blockChance };
   });
   return best;
@@ -1439,15 +1456,19 @@ function previewBlockPreview(attacker, defender) {
   const bonusA = attackerAssists.reduce((s, p) => s + Math.floor(p.bl / 2), 0);
   const bonusB = defenderAssists.reduce((s, p) => s + Math.floor(p.bl / 2), 0);
   const movePenalty = movementBlockPenalty(attacker);
-  const totalA = attacker.bl + bonusA - movePenalty;
-  const totalB = defender.bl + bonusB;
+  const attackerHasBlockSkill = hasSkill(attacker, 'Block');
+  const defenderHasBlockSkill = hasSkill(defender, 'Block');
+  const totalA = attacker.bl + bonusA - movePenalty + (attackerHasBlockSkill ? 1 : 0);
+  const totalB = defender.bl + bonusB + (defenderHasBlockSkill ? 1 : 0);
   const diff = totalA - totalB;
   const chanceA = opposedChance(totalA, totalB);
 
   let html = `<b>🛡️ Block</b><br>` +
     `BL #${attacker.number} ${attacker.bl}${bonusA ? ' + ' + bonusA + ' Unterst.' : ''}` +
-    `${movePenalty ? ' - ' + movePenalty + ' Bewegungsabzug' : ''} = ${totalA}  vs  ` +
-    `BL #${defender.number} ${defender.bl}${bonusB ? ' + ' + bonusB + ' Unterst.' : ''} = ${totalB}  ` +
+    `${movePenalty ? ' - ' + movePenalty + ' Bewegungsabzug' : ''}` +
+    `${attackerHasBlockSkill ? ' + 1 Block-Skill' : ''} = ${totalA}  vs  ` +
+    `BL #${defender.number} ${defender.bl}${bonusB ? ' + ' + bonusB + ' Unterst.' : ''}` +
+    `${defenderHasBlockSkill ? ' + 1 Block-Skill' : ''} = ${totalB}  ` +
     `(Differenz ${diff >= 0 ? '+' : ''}${diff})<br>`;
   if (attackerAssists.length) {
     html += `Unterstützer #${attacker.number}: ${attackerAssists.map(p => '#' + p.number + ' (+' + Math.floor(p.bl / 2) + ')').join(', ')}<br>`;
@@ -1457,6 +1478,10 @@ function previewBlockPreview(attacker, defender) {
   }
   if (attacker.mr !== attacker.movesLeft && hasSkill(attacker, 'Blitz')) {
     html += `#${attacker.number} hat Blitz: kein Bewegungsabzug trotz genutzter MR.<br>`;
+  }
+  if (totalA === totalB && attackerHasBlockSkill !== defenderHasBlockSkill) {
+    const tieWinner = attackerHasBlockSkill ? attacker : defender;
+    html += `Bei Gleichstand gewinnt #${tieWinner.number} automatisch (Skill Block).<br>`;
   }
   html += `Erfolg #${attacker.number}: ${chanceSpan(chanceA)} · Erfolg #${defender.number}: ${chanceSpan(1 - chanceA)}` +
     `<br><small>(Näherung, ohne Krit-10/Krit-1)</small>`;

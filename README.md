@@ -80,11 +80,12 @@ damit – die Rüstungsfunktion, für die er ursprünglich als Provisorium dient
 ### Skills
 
 Jede Position kann von Beginn an feste Skills mitbringen (`POSITIONS[...].skills`,
-übernommen in `player.skills`). Bislang nur ein Skill implementiert:
+übernommen in `player.skills`). Bislang implementiert:
 
 | Position | Skill    | Effekt |
 |----------|----------|--------|
 | Läufer   | **Blitz** | Kein Bewegungsabzug beim Blocken (siehe Abschnitt 7a), auch wenn vorher MR verbraucht wurden. |
+| Blocker  | **Block** | Beim Blocken (nicht beim Tackeln) +1 auf den Blockwurf, für Blocker *und* Geblockten. Hat nur einer von beiden diesen Skill, gewinnt er den Block auch bei Gleichstand automatisch, der andere stürzt. |
 
 Weitere Positionen/Skills sind als Ausbaustufe vorgesehen (siehe Offene Punkte).
 
@@ -153,6 +154,15 @@ Fließt konsistent in dieselben drei Stellen ein wie die Unterstützung
 
 Spieler mit dem Skill **Blitz** (siehe Abschnitt 4) sind von diesem Abzug
 komplett ausgenommen, unabhängig davon, wie viele MR sie bereits genutzt haben.
+
+**Skill Block:** Spieler mit dem Skill **Block** (siehe Abschnitt 4) erhalten
++1 auf ihren BL-Wurf beim Blocken – das gilt für den Blocker *und* für den
+Geblockten, aber ausdrücklich nicht beim Tackeln (`attemptLeavingTackleZones`
+bleibt unverändert). Haben beide Beteiligten den Skill, heben sich die Boni
+gegeneinander auf. Hat nur einer von beiden den Skill, gewinnt er bei
+Gleichstand automatisch (statt des sonst üblichen "Unentschieden – beide
+bleiben stehen"); der andere fällt um und durchläuft den Verletzungscheck
+(siehe 7b) wie ein regulärer Verlierer.
 
 ## 7b. Verletzungscheck (RW & SP)
 
@@ -251,7 +261,7 @@ schwerer als normal.
   sonst noch keine weitere Spielmechanik – kein Regenerations- oder
   Erschöpfungssystem für SP jenseits des Verletzungschecks.
 - **Skills** sind als System angelegt (`POSITIONS[...].skills`, `player.skills`,
-  `hasSkill`), bislang aber nur für den Läufer (Blitz) belegt. Blocker, Fänger
+  `hasSkill`), bislang für Läufer (Blitz) und Blocker (Block) belegt. Fänger
   und Werfer haben noch keine eigenen Skills – vorgesehen als nächster Schritt.
 - KI wirft nicht selbst (keine Pass-Entscheidungslogik für Rot).
 
