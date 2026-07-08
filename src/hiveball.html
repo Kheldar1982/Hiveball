@@ -229,11 +229,20 @@ let gameEnded = false;
 // Die Werte summieren sich je Position auf 20 (BL+ST+CO+AG+PA), MR steht
 // separat außerhalb dieses Budgets. RW (Rüstungswert) und SP (Stamina Points)
 // werden aus CO abgeleitet, siehe ARMOR_BONUS / STAMINA_MULTIPLIER unten.
+// skills: Positions-Startskills, die jeder Spieler dieser Position von Beginn an hat
+// (siehe SKILLS unten für die Effekte der einzelnen Skills).
 const POSITIONS = {
-  Blocker: { icon: '🛡️', mr: 4, bl: 5, st: 5, co: 5, ag: 2, pa: 3 },
-  Läufer:  { icon: '🏃', mr: 6, bl: 3, st: 3, co: 3, ag: 6, pa: 5 },
-  Fänger:  { icon: '🙌', mr: 6, bl: 2, st: 2, co: 3, ag: 7, pa: 6 },
-  Werfer:  { icon: '🎯', mr: 5, bl: 3, st: 3, co: 4, ag: 4, pa: 6 },
+  Blocker: { icon: '🛡️', mr: 4, bl: 5, st: 5, co: 5, ag: 2, pa: 3, skills: [] },
+  Läufer:  { icon: '🏃', mr: 6, bl: 3, st: 3, co: 3, ag: 6, pa: 5, skills: ['Blitz'] },
+  Fänger:  { icon: '🙌', mr: 6, bl: 2, st: 2, co: 3, ag: 7, pa: 6, skills: [] },
+  Werfer:  { icon: '🎯', mr: 5, bl: 3, st: 3, co: 4, ag: 4, pa: 6, skills: [] },
+};
+
+// Bekannte Skills und ihre Kurzbeschreibung (rein informativ, die eigentliche
+// Wirkung ist an der jeweiligen Stelle im Code implementiert, z.B. Blitz in
+// movementBlockPenalty).
+const SKILLS = {
+  Blitz: 'Kein Bewegungsabzug beim Blocken, auch nach genutzten MR.',
 };
 
 // RW = CO + ARMOR_BONUS (ersetzt den früheren pauschalen CO-Bonus).
@@ -248,6 +257,23 @@ const TEAM_ROSTER = ['Blocker', 'Blocker', 'Werfer', 'Fänger', 'Läufer'];
 // damit ein Umfallen auch dann eine spürbare Konsequenz hat, wenn es während des gegnerischen
 // Zuges passiert ist – der Spieler steht nicht automatisch gratis vor dem eigenen Zug auf.
 const STAND_UP_COST = 2;
+
+// Ein Block nach Bewegung ist grundsätzlich erschwert: pro angefangene(!) zwei in
+// diesem Zug genutzte MR (inkl. für Aufstehen verbrauchter MR) sinkt der BL-Wert
+// des Blockers um 1 (ungerade genutzte MR werden aufgerundet).
+const MOVEMENT_BLOCK_PENALTY_PER_MR = 2;
+
+function hasSkill(p, skillName) {
+  return p.skills.includes(skillName);
+}
+
+// Wie viel BL-Abzug ein Spieler durch in diesem Zug bereits genutzte MR hat
+// (siehe MOVEMENT_BLOCK_PENALTY_PER_MR). Blitz hebt diesen Abzug komplett auf.
+function movementBlockPenalty(p) {
+  if (hasSkill(p, 'Blitz')) return 0;
+  const usedMR = p.mr - p.movesLeft;
+  return usedMR > 0 ? Math.ceil(usedMR / MOVEMENT_BLOCK_PENALTY_PER_MR) : 0;
+}
 
 /* ============================================================
    SPIEL AUFSETZEN
@@ -268,6 +294,7 @@ function createPlayer(id, number, team, position, x, y) {
     pa: stats.pa,
     rw: stats.co + ARMOR_BONUS,
     sp: stats.co * STAMINA_MULTIPLIER,
+    skills: [...stats.skills],
     prone: false,
     injured: false,
     acted: false
@@ -1021,9 +1048,14 @@ function resolveBlock(attacker, defender) {
       defenderAssists.map(p => `#${p.number} (+${Math.floor(p.bl / 2)})`).join(', '));
   }
 
-  // 1) BL-Duell entscheidet, wer umfällt (inkl. Unterstützungsboni)
+  // 1) BL-Duell entscheidet, wer umfällt (inkl. Unterstützungsboni und Bewegungsabzug)
+  const movePenalty = movementBlockPenalty(attacker);
+  if (attacker.mr !== attacker.movesLeft && hasSkill(attacker, 'Blitz')) {
+    log(`${teams[attacker.team].name} #${attacker.number} nutzt Blitz: kein Bewegungsabzug trotz genutzter MR.`);
+  }
   const blockResult = rollOpposed(
-    [{ label: 'BL', value: attacker.bl }, ...assistParts(attackerAssists)],
+    [{ label: 'BL', value: attacker.bl }, ...assistParts(attackerAssists),
+      ...(movePenalty ? [{ label: 'Bewegungsabzug', value: -movePenalty }] : [])],
     [{ label: 'BL', value: defender.bl }, ...assistParts(defenderAssists)]
   );
   log(`BL-Duell – ${teams[attacker.team].name} #${attacker.number}: ${blockResult.descA}  vs  ${teams[defender.team].name} #${defender.number}: ${blockResult.descB}${blockResult.note}`);
@@ -1213,7 +1245,7 @@ function findBestBlockOption(p) {
     // sobald Teamkameraden mit unterstützen (siehe getBlockAssists/resolveBlock).
     const bonusP = getBlockAssists(p, e).reduce((s, a) => s + Math.floor(a.bl / 2), 0);
     const bonusE = getBlockAssists(e, p).reduce((s, a) => s + Math.floor(a.bl / 2), 0);
-    const blockChance = opposedChance(p.bl + bonusP, e.bl + bonusE);
+    const blockChance = opposedChance(p.bl + bonusP - movementBlockPenalty(p), e.bl + bonusE);
     if (!best || blockChance > best.blockChance) best = { enemy: e, blockChance };
   });
   return best;
@@ -1406,13 +1438,15 @@ function previewBlockPreview(attacker, defender) {
   const defenderAssists = getBlockAssists(defender, attacker);
   const bonusA = attackerAssists.reduce((s, p) => s + Math.floor(p.bl / 2), 0);
   const bonusB = defenderAssists.reduce((s, p) => s + Math.floor(p.bl / 2), 0);
-  const totalA = attacker.bl + bonusA;
+  const movePenalty = movementBlockPenalty(attacker);
+  const totalA = attacker.bl + bonusA - movePenalty;
   const totalB = defender.bl + bonusB;
   const diff = totalA - totalB;
   const chanceA = opposedChance(totalA, totalB);
 
   let html = `<b>🛡️ Block</b><br>` +
-    `BL #${attacker.number} ${attacker.bl}${bonusA ? ' + ' + bonusA + ' Unterst.' : ''} = ${totalA}  vs  ` +
+    `BL #${attacker.number} ${attacker.bl}${bonusA ? ' + ' + bonusA + ' Unterst.' : ''}` +
+    `${movePenalty ? ' - ' + movePenalty + ' Bewegungsabzug' : ''} = ${totalA}  vs  ` +
     `BL #${defender.number} ${defender.bl}${bonusB ? ' + ' + bonusB + ' Unterst.' : ''} = ${totalB}  ` +
     `(Differenz ${diff >= 0 ? '+' : ''}${diff})<br>`;
   if (attackerAssists.length) {
@@ -1420,6 +1454,9 @@ function previewBlockPreview(attacker, defender) {
   }
   if (defenderAssists.length) {
     html += `Unterstützer #${defender.number}: ${defenderAssists.map(p => '#' + p.number + ' (+' + Math.floor(p.bl / 2) + ')').join(', ')}<br>`;
+  }
+  if (attacker.mr !== attacker.movesLeft && hasSkill(attacker, 'Blitz')) {
+    html += `#${attacker.number} hat Blitz: kein Bewegungsabzug trotz genutzter MR.<br>`;
   }
   html += `Erfolg #${attacker.number}: ${chanceSpan(chanceA)} · Erfolg #${defender.number}: ${chanceSpan(1 - chanceA)}` +
     `<br><small>(Näherung, ohne Krit-10/Krit-1)</small>`;

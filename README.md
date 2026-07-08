@@ -77,6 +77,17 @@ damit – die Rüstungsfunktion, für die er ursprünglich als Provisorium dient
   (Umfallen hat auch dann eine spürbare Konsequenz, wenn es während des
   gegnerischen Zuges passiert ist – kein gratis Aufstehen vor dem eigenen Zug).
 
+### Skills
+
+Jede Position kann von Beginn an feste Skills mitbringen (`POSITIONS[...].skills`,
+übernommen in `player.skills`). Bislang nur ein Skill implementiert:
+
+| Position | Skill    | Effekt |
+|----------|----------|--------|
+| Läufer   | **Blitz** | Kein Bewegungsabzug beim Blocken (siehe Abschnitt 7a), auch wenn vorher MR verbraucht wurden. |
+
+Weitere Positionen/Skills sind als Ausbaustufe vorgesehen (siehe Offene Punkte).
+
 ## 5. Würfelsystem
 
 - Alle Würfe nutzen einen **W10**.
@@ -130,6 +141,18 @@ gleichzeitig Unterstützung erhalten. Fließt konsistent in drei Stellen ein:
   korrigierte Erfolgschance.
 - `findBestBlockOption` – die KI rechnet Unterstützung mit ein, wenn sie
   entscheidet, ob Blocken einer riskanten Bewegung vorzuziehen ist.
+
+**Bewegungsabzug beim Block:** Ein Block nach vorheriger Bewegung im selben Zug ist
+grundsätzlich erschwert (`movementBlockPenalty`). Pro angefangene zwei in diesem Zug
+bereits genutzte MR (`MOVEMENT_BLOCK_PENALTY_PER_MR = 2`, ungerade genutzte MR werden
+aufgerundet) sinkt der BL-Wert des *Blockers* (nicht des Geblockten) um 1. Auch für
+Aufstehen genutzte MR (`STAND_UP_COST`) zählen mit, da beides über `movesLeft`
+erfasst wird. Gilt nur für den aktiv blockenden Spieler, nicht für Unterstützer.
+Fließt konsistent in dieselben drei Stellen ein wie die Unterstützung
+(`resolveBlock`, `previewBlockPreview`, `findBestBlockOption`).
+
+Spieler mit dem Skill **Blitz** (siehe Abschnitt 4) sind von diesem Abzug
+komplett ausgenommen, unabhängig davon, wie viele MR sie bereits genutzt haben.
 
 ## 7b. Verletzungscheck (RW & SP)
 
@@ -227,6 +250,9 @@ schwerer als normal.
 - RW und SP fließen in den Verletzungscheck ein (siehe 7b), haben aber
   sonst noch keine weitere Spielmechanik – kein Regenerations- oder
   Erschöpfungssystem für SP jenseits des Verletzungschecks.
+- **Skills** sind als System angelegt (`POSITIONS[...].skills`, `player.skills`,
+  `hasSkill`), bislang aber nur für den Läufer (Blitz) belegt. Blocker, Fänger
+  und Werfer haben noch keine eigenen Skills – vorgesehen als nächster Schritt.
 - KI wirft nicht selbst (keine Pass-Entscheidungslogik für Rot).
 
 ## Projektstruktur
