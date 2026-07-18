@@ -86,6 +86,7 @@ Jede Position kann von Beginn an feste Skills mitbringen (`POSITIONS[...].skills
 |----------|----------|--------|
 | Läufer   | **Blitz** | Kein Bewegungsabzug beim Blocken (siehe Abschnitt 7a), auch wenn vorher MR verbraucht wurden. |
 | Blocker  | **Block** | Beim Blocken (nicht beim Tackeln) +1 auf den Blockwurf, für Blocker *und* Geblockten. Hat nur einer von beiden diesen Skill, gewinnt er den Block auch bei Gleichstand automatisch, der andere stürzt. |
+| Fänger   | **Dodge** | Wird geblockt, wirft der Fänger AG statt BL. Gewinnt er (oder hält den Block zu seinen Gunsten), fällt der Angreifer *nicht* wie sonst üblich – außer der Angreifer würfelt dabei selbst eine natürliche 1. |
 
 Weitere Positionen/Skills sind als Ausbaustufe vorgesehen (siehe Offene Punkte).
 
@@ -163,6 +164,16 @@ gegeneinander auf. Hat nur einer von beiden den Skill, gewinnt er bei
 Gleichstand automatisch (statt des sonst üblichen "Unentschieden – beide
 bleiben stehen"); der andere fällt um und durchläuft den Verletzungscheck
 (siehe 7b) wie ein regulärer Verlierer.
+
+**Skill Dodge:** Wird ein Spieler mit dem Skill **Dodge** (siehe Abschnitt 4)
+geblockt, wirft er statt seines BL-Werts seinen AG-Wert im BL-Duell (weiterhin
+inkl. eigener Unterstützung/Block-Skill-Bonus, falls vorhanden). Gewinnt der
+Dodge-Spieler den Block (oder hält ihn per Gleichstand-Regel zu seinen
+Gunsten), fällt der Angreifer – anders als bei einem normalen Block – *nicht*
+um; es findet auch kein Verletzungscheck statt. Einzige Ausnahme: Würfelt der
+Angreifer dabei selbst eine natürliche 1, stolpert er trotzdem und durchläuft
+den regulären Sturz- und Verletzungscheck als Verlierer. Gewinnt umgekehrt der
+Angreifer den Block regulär, fällt der Dodge-Spieler wie gewohnt um.
 
 ## 7b. Verletzungscheck (RW & SP)
 
@@ -261,8 +272,8 @@ schwerer als normal.
   sonst noch keine weitere Spielmechanik – kein Regenerations- oder
   Erschöpfungssystem für SP jenseits des Verletzungschecks.
 - **Skills** sind als System angelegt (`POSITIONS[...].skills`, `player.skills`,
-  `hasSkill`), bislang für Läufer (Blitz) und Blocker (Block) belegt. Fänger
-  und Werfer haben noch keine eigenen Skills – vorgesehen als nächster Schritt.
+  `hasSkill`), bislang für Läufer (Blitz), Blocker (Block) und Fänger (Dodge)
+  belegt. Werfer hat noch keinen eigenen Skill – vorgesehen als nächster Schritt.
 - KI wirft nicht selbst (keine Pass-Entscheidungslogik für Rot).
 
 ## Projektstruktur

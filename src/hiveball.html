@@ -234,18 +234,21 @@ let gameEnded = false;
 const POSITIONS = {
   Blocker: { icon: '🛡️', mr: 4, bl: 5, st: 5, co: 5, ag: 2, pa: 3, skills: ['Block'] },
   Läufer:  { icon: '🏃', mr: 6, bl: 3, st: 3, co: 3, ag: 6, pa: 5, skills: ['Blitz'] },
-  Fänger:  { icon: '🙌', mr: 6, bl: 2, st: 2, co: 3, ag: 7, pa: 6, skills: [] },
+  Fänger:  { icon: '🙌', mr: 6, bl: 2, st: 2, co: 3, ag: 7, pa: 6, skills: ['Dodge'] },
   Werfer:  { icon: '🎯', mr: 5, bl: 3, st: 3, co: 4, ag: 4, pa: 6, skills: [] },
 };
 
 // Bekannte Skills und ihre Kurzbeschreibung (rein informativ, die eigentliche
 // Wirkung ist an der jeweiligen Stelle im Code implementiert, z.B. Blitz in
-// movementBlockPenalty, Block in resolveBlock/previewBlockPreview/findBestBlockOption).
+// movementBlockPenalty, Block/Dodge in resolveBlock/previewBlockPreview/findBestBlockOption).
 const SKILLS = {
   Blitz: 'Kein Bewegungsabzug beim Blocken, auch nach genutzten MR.',
   Block: 'Beim Blocken (nicht beim Tackeln) +1 auf den Blockwurf, für Blocker ' +
     'und Geblockten. Hat nur einer von beiden diesen Skill, gewinnt er den ' +
     'Block auch bei Gleichstand automatisch.',
+  Dodge: 'Nutzt beim Geblocktwerden den eigenen AG-Wert statt BL. Gewinnt der ' +
+    'Dodge-Spieler, fällt der Angreifer nicht wie sonst üblich – nur eine ' +
+    'natürliche 1 des Angreifers lässt diesen trotzdem stürzen.',
 };
 
 // RW = CO + ARMOR_BONUS (ersetzt den früheren pauschalen CO-Bonus).
@@ -1051,19 +1054,23 @@ function resolveBlock(attacker, defender) {
       defenderAssists.map(p => `#${p.number} (+${Math.floor(p.bl / 2)})`).join(', '));
   }
 
-  // 1) BL-Duell entscheidet, wer umfällt (inkl. Unterstützungsboni, Bewegungsabzug
-  // und dem Block-Skill – dieser gilt nur beim Blocken, nicht beim Tackeln).
+  // 1) BL-Duell entscheidet, wer umfällt (inkl. Unterstützungsboni, Bewegungsabzug,
+  // Block-Skill – gilt nur beim Blocken, nicht beim Tackeln – und Dodge: der
+  // Geblockte wirft statt BL seinen AG-Wert, wenn er den Skill Dodge hat).
   const movePenalty = movementBlockPenalty(attacker);
   if (attacker.mr !== attacker.movesLeft && hasSkill(attacker, 'Blitz')) {
     log(`${teams[attacker.team].name} #${attacker.number} nutzt Blitz: kein Bewegungsabzug trotz genutzter MR.`);
   }
   const attackerHasBlockSkill = hasSkill(attacker, 'Block');
   const defenderHasBlockSkill = hasSkill(defender, 'Block');
+  const defenderHasDodge = hasSkill(defender, 'Dodge');
+  const defenderAttrLabel = defenderHasDodge ? 'AG' : 'BL';
+  const defenderAttrValue = defenderHasDodge ? defender.ag : defender.bl;
   const blockResult = rollOpposed(
     [{ label: 'BL', value: attacker.bl }, ...assistParts(attackerAssists),
       ...(movePenalty ? [{ label: 'Bewegungsabzug', value: -movePenalty }] : []),
       ...(attackerHasBlockSkill ? [{ label: 'Block-Skill', value: 1 }] : [])],
-    [{ label: 'BL', value: defender.bl }, ...assistParts(defenderAssists),
+    [{ label: defenderAttrLabel, value: defenderAttrValue }, ...assistParts(defenderAssists),
       ...(defenderHasBlockSkill ? [{ label: 'Block-Skill', value: 1 }] : [])]
   );
   log(`BL-Duell – ${teams[attacker.team].name} #${attacker.number}: ${blockResult.descA}  vs  ${teams[defender.team].name} #${defender.number}: ${blockResult.descB}${blockResult.note}`);
@@ -1080,6 +1087,17 @@ function resolveBlock(attacker, defender) {
 
   if (!winner) {
     setStatus('Unentschieden – beide bleiben stehen.');
+    attacker.acted = true;
+    draw();
+    return;
+  }
+
+  // Dodge: Weicht der Geblockte erfolgreich aus (er gewinnt bzw. der Block bleibt
+  // unentschieden zu seinen Gunsten aufgelöst), fällt der Angreifer NICHT wie sonst
+  // üblich – außer er würfelt dabei selbst eine natürliche 1 und stolpert.
+  if (defenderHasDodge && loser === attacker && blockResult.rawA !== 1) {
+    log(`${teams[defender.team].name} #${defender.number} weicht dem Block aus (Skill Dodge) – ${teams[attacker.team].name} #${attacker.number} bleibt stehen.`);
+    setStatus(`Spieler ${defender.number} weicht dem Block erfolgreich aus.`);
     attacker.acted = true;
     draw();
     return;
@@ -1259,9 +1277,10 @@ function findBestBlockOption(p) {
     // sobald Teamkameraden mit unterstützen (siehe getBlockAssists/resolveBlock).
     const bonusP = getBlockAssists(p, e).reduce((s, a) => s + Math.floor(a.bl / 2), 0);
     const bonusE = getBlockAssists(e, p).reduce((s, a) => s + Math.floor(a.bl / 2), 0);
+    const eBaseAttr = hasSkill(e, 'Dodge') ? e.ag : e.bl;
     const blockChance = opposedChance(
       p.bl + bonusP - movementBlockPenalty(p) + (hasSkill(p, 'Block') ? 1 : 0),
-      e.bl + bonusE + (hasSkill(e, 'Block') ? 1 : 0)
+      eBaseAttr + bonusE + (hasSkill(e, 'Block') ? 1 : 0)
     );
     if (!best || blockChance > best.blockChance) best = { enemy: e, blockChance };
   });
@@ -1458,8 +1477,11 @@ function previewBlockPreview(attacker, defender) {
   const movePenalty = movementBlockPenalty(attacker);
   const attackerHasBlockSkill = hasSkill(attacker, 'Block');
   const defenderHasBlockSkill = hasSkill(defender, 'Block');
+  const defenderHasDodge = hasSkill(defender, 'Dodge');
+  const defenderAttrLabel = defenderHasDodge ? 'AG' : 'BL';
+  const defenderAttrValue = defenderHasDodge ? defender.ag : defender.bl;
   const totalA = attacker.bl + bonusA - movePenalty + (attackerHasBlockSkill ? 1 : 0);
-  const totalB = defender.bl + bonusB + (defenderHasBlockSkill ? 1 : 0);
+  const totalB = defenderAttrValue + bonusB + (defenderHasBlockSkill ? 1 : 0);
   const diff = totalA - totalB;
   const chanceA = opposedChance(totalA, totalB);
 
@@ -1467,7 +1489,7 @@ function previewBlockPreview(attacker, defender) {
     `BL #${attacker.number} ${attacker.bl}${bonusA ? ' + ' + bonusA + ' Unterst.' : ''}` +
     `${movePenalty ? ' - ' + movePenalty + ' Bewegungsabzug' : ''}` +
     `${attackerHasBlockSkill ? ' + 1 Block-Skill' : ''} = ${totalA}  vs  ` +
-    `BL #${defender.number} ${defender.bl}${bonusB ? ' + ' + bonusB + ' Unterst.' : ''}` +
+    `${defenderAttrLabel} #${defender.number} ${defenderAttrValue}${bonusB ? ' + ' + bonusB + ' Unterst.' : ''}` +
     `${defenderHasBlockSkill ? ' + 1 Block-Skill' : ''} = ${totalB}  ` +
     `(Differenz ${diff >= 0 ? '+' : ''}${diff})<br>`;
   if (attackerAssists.length) {
@@ -1482,6 +1504,10 @@ function previewBlockPreview(attacker, defender) {
   if (totalA === totalB && attackerHasBlockSkill !== defenderHasBlockSkill) {
     const tieWinner = attackerHasBlockSkill ? attacker : defender;
     html += `Bei Gleichstand gewinnt #${tieWinner.number} automatisch (Skill Block).<br>`;
+  }
+  if (defenderHasDodge) {
+    html += `#${defender.number} hat Dodge: gewinnt #${defender.number}, stürzt #${attacker.number} ` +
+      `nicht – außer bei einer gewürfelten 1.<br>`;
   }
   html += `Erfolg #${attacker.number}: ${chanceSpan(chanceA)} · Erfolg #${defender.number}: ${chanceSpan(1 - chanceA)}` +
     `<br><small>(Näherung, ohne Krit-10/Krit-1)</small>`;
