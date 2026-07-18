@@ -232,7 +232,7 @@ let gameEnded = false;
    ============================================================ */
 // Die Werte summieren sich je Position auf 20 (BL+ST+CO+AG+PA), MR steht
 // separat außerhalb dieses Budgets. RW (Rüstungswert) und SP (Stamina Points)
-// werden aus CO abgeleitet, siehe ARMOR_BONUS / STAMINA_MULTIPLIER unten.
+// werden aus CO plus Ausrüstung abgeleitet, siehe EQUIPMENT / STAMINA_MULTIPLIER unten.
 // skills: Positions-Startskills, die jeder Spieler dieser Position von Beginn an hat
 // (siehe SKILLS unten für die Effekte der einzelnen Skills).
 const POSITIONS = {
@@ -255,10 +255,65 @@ const SKILLS = {
     'natürliche 1 des Angreifers lässt diesen trotzdem stürzen.',
 };
 
-// RW = CO + ARMOR_BONUS (ersetzt den früheren pauschalen CO-Bonus).
-const ARMOR_BONUS = 3;
-// SP zu Spielbeginn = CO * STAMINA_MULTIPLIER.
+// SP zu Spielbeginn = CO * STAMINA_MULTIPLIER. RW (Rüstungswert) kommt komplett
+// aus der Ausrüstung, siehe EQUIPMENT unten.
 const STAMINA_MULTIPLIER = 3;
+
+/* ============================================================
+   AUSRÜSTUNG
+   ============================================================ */
+// Jeder Spieler trägt 4 Ausrüstungsteile: Körperrüstung, Schuhe, Helm, Handschuhe.
+// Jedes Item kann Attribut-Modifikatoren (mod) geben: mr/bl/st/co/ag/pa sowie
+// rw (Rüstungswert) und spMax (zusätzliche maximale Stamina). Aktuell gibt es
+// pro Slot nur ein Standard-Item; weitere Varianten kommen später dazu, z.B.
+// leichtere/schwerere Rüstung (RW hoch, dafür MR runter), Schuhe mit MR-Bonus
+// oder sicherem Tritt bei Extrafeldern, Helme mit Schutz vor kritischen
+// Treffern oder zusätzlicher Stamina, Handschuhe mit Boni beim Fangen/
+// Werfen/Blocken.
+const EQUIPMENT = {
+  armor: {
+    // Ersetzt den früheren pauschalen ARMOR_BONUS von +3 auf RW.
+    standard: { name: 'Standard-Körperrüstung', mod: { rw: 3 } }
+  },
+  boots: {
+    standard: { name: 'Standard-Schuhe', mod: {} }
+  },
+  helmet: {
+    standard: { name: 'Standard-Helm', mod: {} }
+  },
+  gloves: {
+    standard: { name: 'Standard-Handschuhe', mod: {} }
+  }
+};
+
+// Jeder Spieler startet mit der Standardausrüstung in allen 4 Slots.
+const DEFAULT_LOADOUT = { armor: 'standard', boots: 'standard', helmet: 'standard', gloves: 'standard' };
+
+function getEquipmentModifiers(equipment) {
+  const total = { mr: 0, bl: 0, st: 0, co: 0, ag: 0, pa: 0, rw: 0, spMax: 0 };
+  for (const slot in equipment) {
+    const item = EQUIPMENT[slot] && EQUIPMENT[slot][equipment[slot]];
+    if (!item) continue;
+    for (const key in item.mod) total[key] += item.mod[key];
+  }
+  return total;
+}
+
+// Berechnet die effektiven Attribute (Basiswert der Position + Ausrüstungsboni)
+// sowie RW und maximale SP daraus, und schreibt sie auf den Spieler. Aufgerufen
+// bei Erstellung und bei jedem künftigen Ausrüstungswechsel.
+function applyEquipment(player) {
+  const mod = getEquipmentModifiers(player.equipment);
+  const base = player.baseStats;
+  player.mr = base.mr + mod.mr;
+  player.bl = base.bl + mod.bl;
+  player.st = base.st + mod.st;
+  player.co = base.co + mod.co;
+  player.ag = base.ag + mod.ag;
+  player.pa = base.pa + mod.pa;
+  player.rw = player.co + mod.rw;
+  player.spMax = player.co * STAMINA_MULTIPLIER + mod.spMax;
+}
 
 // Team-Zusammensetzung "Option A": 2 Blocker, 1 Läufer, 1 Fänger, 1 Werfer
 const TEAM_ROSTER = ['Blocker', 'Blocker', 'Werfer', 'Fänger', 'Läufer'];
@@ -330,21 +385,13 @@ const ZIELWERT_FOUL = 4;
    ============================================================ */
 function createPlayer(id, number, team, position, x, y) {
   const stats = POSITIONS[position];
-  return {
+  const player = {
     id,           // intern eindeutige ID (über beide Teams hinweg) – für Spiellogik
     number,       // Anzeige-Trikotnummer 1-5, innerhalb des eigenen Teams eindeutig
     team, x, y, position,
     startX: x, startY: y,
-    mr: stats.mr,
-    movesLeft: stats.mr,
-    bl: stats.bl,
-    st: stats.st,
-    co: stats.co,
-    ag: stats.ag,
-    pa: stats.pa,
-    rw: stats.co + ARMOR_BONUS,
-    sp: stats.co * STAMINA_MULTIPLIER,
-    spMax: stats.co * STAMINA_MULTIPLIER,
+    baseStats: { mr: stats.mr, bl: stats.bl, st: stats.st, co: stats.co, ag: stats.ag, pa: stats.pa },
+    equipment: { ...DEFAULT_LOADOUT },
     skills: [...stats.skills],
     prone: false,
     injured: false,
@@ -355,6 +402,10 @@ function createPlayer(id, number, team, position, x, y) {
     sentOff: false,
     acted: false
   };
+  applyEquipment(player);
+  player.movesLeft = player.mr;
+  player.sp = player.spMax;
+  return player;
 }
 
 function setupTeams() {
