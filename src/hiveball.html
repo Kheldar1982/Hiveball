@@ -281,6 +281,41 @@ function movementBlockPenalty(p) {
   return usedMR > 0 ? Math.ceil(usedMR / MOVEMENT_BLOCK_PENALTY_PER_MR) : 0;
 }
 
+// Über die regulären MR hinaus kann sich jeder Spieler bis zu MAX_EXTRA_SQUARES
+// zusätzliche Felder bewegen ("Extrafelder"). Jedes Extrafeld kostet SP statt MR
+// und erfordert einen Agilitätswurf gegen EXTRA_SQUARE_TARGET (siehe attemptExtraSquare).
+const MAX_EXTRA_SQUARES = 2;
+const EXTRA_SQUARE_SP_COST = 1;
+const EXTRA_SQUARE_TARGET = 10;
+
+// Wie viele Extrafelder sich ein Spieler aktuell noch leisten kann (durch SP begrenzt).
+function availableExtraSquares(p) {
+  return Math.max(0, Math.min(MAX_EXTRA_SQUARES, p.sp));
+}
+
+// Löst ein einzelnes Extrafeld auf: kostet EXTRA_SQUARE_SP_COST SP und erfordert einen
+// Agilitätswurf (AG) gegen EXTRA_SQUARE_TARGET. Bei Erfolg bewegt sich der Spieler normal
+// weiter. Bei einem Fehlschlag stürzt er an seiner aktuellen Position, verliert zusätzlich
+// SP und der Ball verspringt, falls er ihn trug. Gibt true zurück, wenn der Spieler dabei
+// gestürzt ist (die aufrufende Bewegungsschleife muss dann abbrechen).
+function attemptExtraSquare(p, stepNumber) {
+  p.sp -= EXTRA_SQUARE_SP_COST;
+  const roll = rollAgainstTarget([{ label: 'AG', value: p.ag }], EXTRA_SQUARE_TARGET);
+  log(`Extrafeld ${stepNumber}/${MAX_EXTRA_SQUARES} (-${EXTRA_SQUARE_SP_COST} SP) – ${teams[p.team].name} #${p.number}: ${roll.desc}`);
+  if (!roll.success) {
+    p.sp -= EXTRA_SQUARE_SP_COST;
+    p.prone = true;
+    log(`${teams[p.team].name} #${p.number} stürzt beim Extrafeld (zusätzlich -${EXTRA_SQUARE_SP_COST} SP, SP: ${p.sp}).`);
+    if (ball.carrierId === p.id) {
+      log('Der Ball fällt zu Boden und verspringt!');
+      scatterBallNear(p.x, p.y);
+      endTurn(true);
+    }
+    return true;
+  }
+  return false;
+}
+
 /* ============================================================
    SPIEL AUFSETZEN
    ============================================================ */
@@ -601,18 +636,21 @@ function draw() {
     }
   });
 
-  // Erreichbare Felder des ausgewählten Spielers markieren
+  // Erreichbare Felder des ausgewählten Spielers markieren (grün = reguläre MR,
+  // gelb = nur über Extrafelder gegen SP + Agilitätswurf erreichbar)
   const sel = players.find(p => p.id === selectedPlayerId);
   if (sel && currentTeam === TEAM_BLUE && !sel.prone) {
+    const selMaxSteps = sel.movesLeft + availableExtraSquares(sel);
     for (let x = 0; x < COLS; x++) {
       for (let y = 0; y < ROWS; y++) {
         const d = chebyshev(sel.x, sel.y, x, y);
         // Chebyshev-Distanz ist eine untere Schranke für die tatsächliche Weglänge -
         // schnelle Vorab-Ablehnung, bevor die (teurere) Pfadsuche läuft.
-        if (d > 0 && d <= sel.movesLeft) {
-          const path = findSmartPath(sel.x, sel.y, x, y, sel.team, sel.movesLeft);
+        if (d > 0 && d <= selMaxSteps) {
+          const path = findSmartPath(sel.x, sel.y, x, y, sel.team, selMaxSteps);
           if (path) {
-            ctx.fillStyle = 'rgba(80,220,120,0.35)';
+            const usesExtraSquares = path.length > sel.movesLeft;
+            ctx.fillStyle = usesExtraSquares ? 'rgba(240,180,60,0.35)' : 'rgba(80,220,120,0.35)';
             ctx.fillRect(x * CELL + 2, y * CELL + 2, CELL - 4, CELL - 4);
           }
         }
@@ -864,15 +902,20 @@ function finishArrival(player) {
 function movePlayer(player, x, y) {
   logAction(`${teams[player.team].name} #${player.number} bewegt sich Richtung (${x},${y})`, '🏃', player.team);
 
-  const path = findSmartPath(player.x, player.y, x, y, player.team, player.movesLeft);
+  const maxSteps = player.movesLeft + availableExtraSquares(player);
+  const path = findSmartPath(player.x, player.y, x, y, player.team, maxSteps);
   if (!path) {
-    log('Kein gangbarer Weg zum Ziel innerhalb der verbleibenden Bewegungspunkte gefunden.');
+    log('Kein gangbarer Weg zum Ziel innerhalb der verbleibenden Bewegungspunkte (inkl. Extrafelder) gefunden.');
     return;
   }
 
+  let extraSquaresUsed = 0;
+
   for (const step of path) {
-    // Bewegungspunkte aufgebraucht -> Bewegung endet hier (z.B. Ziel weiter weg als MR erlaubt)
-    if (player.movesLeft <= 0) {
+    const usingExtraSquare = player.movesLeft <= 0;
+
+    // Weder reguläre Bewegungspunkte noch (weitere) Extrafelder verfügbar -> Bewegung endet hier
+    if (usingExtraSquare && (extraSquaresUsed >= MAX_EXTRA_SQUARES || player.sp < EXTRA_SQUARE_SP_COST)) {
       break;
     }
 
@@ -880,6 +923,15 @@ function movePlayer(player, x, y) {
     if (playerAt(step.x, step.y)) {
       log(`Weg blockiert bei (${step.x},${step.y}) – Bewegung endet vorzeitig.`);
       break;
+    }
+
+    if (usingExtraSquare) {
+      extraSquaresUsed++;
+      if (attemptExtraSquare(player, extraSquaresUsed)) {
+        updateActionButtons(player);
+        draw();
+        return;
+      }
     }
 
     // Pro Schritt einzeln prüfen, ob ein Gegner tackeln darf – auch wenn der
@@ -893,7 +945,7 @@ function movePlayer(player, x, y) {
 
     player.x = step.x;
     player.y = step.y;
-    player.movesLeft -= 1;
+    if (!usingExtraSquare) player.movesLeft -= 1;
   }
 
   if (!finishArrival(player)) return;
@@ -1304,10 +1356,13 @@ function aiAdvanceCarefully(p, destX, destY) {
     draw();
     return;
   }
-  const path = fullPath.slice(0, p.movesLeft);
+  const path = fullPath.slice(0, p.movesLeft + availableExtraSquares(p));
+
+  let extraSquaresUsed = 0;
 
   for (const step of path) {
-    if (p.movesLeft <= 0) break;
+    const usingExtraSquare = p.movesLeft <= 0;
+    if (usingExtraSquare && (extraSquaresUsed >= MAX_EXTRA_SQUARES || p.sp < EXTRA_SQUARE_SP_COST)) break;
 
     const risk = findRiskiestTackle(p, step.x, step.y);
     if (risk) {
@@ -1324,6 +1379,15 @@ function aiAdvanceCarefully(p, destX, destY) {
       break;
     }
 
+    if (usingExtraSquare) {
+      extraSquaresUsed++;
+      if (attemptExtraSquare(p, extraSquaresUsed)) {
+        updateActionButtons(p);
+        draw();
+        return;
+      }
+    }
+
     const knockedDown = attemptLeavingTackleZones(p, step.x, step.y);
     if (knockedDown) {
       updateActionButtons(p);
@@ -1333,7 +1397,7 @@ function aiAdvanceCarefully(p, destX, destY) {
 
     p.x = step.x;
     p.y = step.y;
-    p.movesLeft -= 1;
+    if (!usingExtraSquare) p.movesLeft -= 1;
   }
 
   if (!finishArrival(p)) return;
@@ -1359,7 +1423,7 @@ function aiTurn() {
     standUpIfNeeded(p);
 
     const dest = aiChooseDestination(p);
-    if (p.movesLeft > 0 && (p.x !== dest.x || p.y !== dest.y)) {
+    if ((p.movesLeft > 0 || availableExtraSquares(p) > 0) && (p.x !== dest.x || p.y !== dest.y)) {
       aiAdvanceCarefully(p, dest.x, dest.y);
       if (gameEnded || currentTeam !== TEAM_RED) return; // Zug wurde durch Touchdown, Spielende oder Turnover bereits beendet
       if (p.prone || p.injured) continue; // beim Laufen getackelt worden
@@ -1420,13 +1484,20 @@ function setPreview(html) {
 }
 
 function previewMovePreview(dodger, destX, destY) {
-  const path = findSmartPath(dodger.x, dodger.y, destX, destY, dodger.team, dodger.movesLeft);
+  const maxSteps = dodger.movesLeft + availableExtraSquares(dodger);
+  const path = findSmartPath(dodger.x, dodger.y, destX, destY, dodger.team, maxSteps);
 
   if (!path) {
-    return `<b>🏃 Bewegung nach (${destX},${destY})</b><br>⚠️ Kein gangbarer Weg innerhalb der verbleibenden Bewegungspunkte.`;
+    return `<b>🏃 Bewegung nach (${destX},${destY})</b><br>⚠️ Kein gangbarer Weg innerhalb der verbleibenden Bewegungspunkte (inkl. Extrafelder).`;
   }
 
   let html = `<b>🏃 Bewegung nach (${destX},${destY})</b><br>`;
+  const extraSquaresNeeded = Math.max(0, path.length - dodger.movesLeft);
+  if (extraSquaresNeeded > 0) {
+    html += `Benötigt ${extraSquaresNeeded} Extrafeld(er): je -${EXTRA_SQUARE_SP_COST} SP und Agilitätswurf ` +
+      `(AG ${dodger.ag}) gegen Ziel ${EXTRA_SQUARE_TARGET}, bei Fehlschlag Sturz + zusätzlich ` +
+      `-${EXTRA_SQUARE_SP_COST} SP.<br>`;
+  }
   let cx = dodger.x, cy = dodger.y;
   let anyTackle = false;
   const tackleLines = [];
@@ -1562,8 +1633,9 @@ function updateHoverPreview(x, y) {
     }
     if (!hovered) {
       const d = chebyshev(sel.x, sel.y, x, y);
+      const selMaxSteps = sel.movesLeft + availableExtraSquares(sel);
       // Chebyshev-Distanz als schnelle Vorab-Ablehnung, dann die echte Pfadsuche
-      if (d > 0 && d <= sel.movesLeft && findSmartPath(sel.x, sel.y, x, y, sel.team, sel.movesLeft)) {
+      if (d > 0 && d <= selMaxSteps && findSmartPath(sel.x, sel.y, x, y, sel.team, selMaxSteps)) {
         setPreview(previewMovePreview(sel, x, y));
         return;
       }
@@ -1643,10 +1715,10 @@ canvas.addEventListener('click', (e) => {
     return;
   }
 
-  // Leeres Feld -> bewegen, falls erreichbar
+  // Leeres Feld -> bewegen, falls erreichbar (inkl. Extrafelder)
   if (!clicked) {
     const dist = chebyshev(sel.x, sel.y, x, y);
-    if (dist > 0 && dist <= sel.movesLeft) {
+    if (dist > 0 && dist <= sel.movesLeft + availableExtraSquares(sel)) {
       movePlayer(sel, x, y);
     }
   }

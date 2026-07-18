@@ -77,6 +77,25 @@ damit – die Rüstungsfunktion, für die er ursprünglich als Provisorium dient
   (Umfallen hat auch dann eine spürbare Konsequenz, wenn es während des
   gegnerischen Zuges passiert ist – kein gratis Aufstehen vor dem eigenen Zug).
 
+### Extrafelder
+
+Sind die regulären MR aufgebraucht, kann sich jeder Spieler bis zu
+`MAX_EXTRA_SQUARES = 2` zusätzliche Felder bewegen (`availableExtraSquares`,
+`attemptExtraSquare`). Jedes Extrafeld kostet `EXTRA_SQUARE_SP_COST = 1` SP
+statt eines Bewegungspunkts und erfordert einen Agilitätswurf (`W10 + AG`)
+gegen `EXTRA_SQUARE_TARGET = 10`. Wie viele Extrafelder tatsächlich verfügbar
+sind, wird zusätzlich durch die aktuellen SP begrenzt (ein Extrafeld ohne SP
+ist nicht möglich). Bei einem Fehlschlag stürzt der Spieler an seiner
+aktuellen Position, verliert zusätzlich `EXTRA_SQUARE_SP_COST` SP (insgesamt
+also 2 SP für dieses Extrafeld) und die Bewegung endet dort – ein getragener
+Ball fällt dabei zu Boden und verspringt wie bei jedem anderen Sturz.
+
+Gilt gleichermaßen für Mensch (`movePlayer`) und KI (`aiAdvanceCarefully`);
+die grün/gelb eingefärbten erreichbaren Felder auf dem Spielfeld sowie die
+Hover-Vorschau (`previewMovePreview`) unterscheiden dabei zwischen regulär
+erreichbaren Feldern (grün) und nur über Extrafelder erreichbaren Feldern
+(gelb, inkl. Hinweis auf SP-Kosten und Sturzrisiko).
+
 ### Skills
 
 Jede Position kann von Beginn an feste Skills mitbringen (`POSITIONS[...].skills`,
@@ -268,9 +287,13 @@ schwerer als normal.
 - Keine Persistenz/Speicherung – Spielstand geht bei Neuladen verloren.
   Relevant, sobald ein Manager-Teil mit Kader über mehrere Spiele hinweg
   existieren soll.
-- RW und SP fließen in den Verletzungscheck ein (siehe 7b), haben aber
-  sonst noch keine weitere Spielmechanik – kein Regenerations- oder
-  Erschöpfungssystem für SP jenseits des Verletzungschecks.
+- RW und SP fließen in den Verletzungscheck (siehe 7b) und in Extrafelder
+  (siehe Abschnitt 4) ein. Es gibt aber kein Regenerations- oder generelles
+  Erschöpfungssystem: SP kann durch Extrafelder auf 0 oder darunter fallen,
+  ohne dass das (anders als beim Verletzungscheck) automatisch "verletzt"
+  auslöst – ein Spieler mit sehr niedrigen/negativen SP kann also weiterhin
+  ganz normal spielen, nur eben keine (oder nur noch wenige) Extrafelder mehr
+  gehen.
 - **Skills** sind als System angelegt (`POSITIONS[...].skills`, `player.skills`,
   `hasSkill`), bislang für Läufer (Blitz), Blocker (Block) und Fänger (Dodge)
   belegt. Werfer hat noch keinen eigenen Skill – vorgesehen als nächster Schritt.
