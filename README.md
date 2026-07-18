@@ -241,7 +241,10 @@ schwerer als normal.
 ## 11. Touchdown, Zugstruktur, Spielende
 
 - Touchdown: Team-Punkt +1, Reset auf Startpositionen, Ball zur Mitte, Zug
-  wechselt automatisch.
+  wechselt automatisch. Zusätzlich ruhen sich dabei alle noch im Spiel
+  befindlichen Spieler (SP > 0, betrifft beide Teams) kurz aus:
+  `regenerateStaminaAfterTouchdown` erhöht ihre SP um den eigenen CO-Wert,
+  gedeckelt auf `spMax` (den Wert zu Spielbeginn, `CO * STAMINA_MULTIPLIER`).
 - Ein Team kann pro Zug mehrere Spieler bewegen; jeder Spieler max. 1 Aktion
   (Block ODER Pass).
 - **Spielende:** Sofortiger Sieg bei `WIN_SCORE = 3` Touchdowns. Sonst Ende
@@ -263,6 +266,21 @@ schwerer als normal.
   Differenz/10) prüft die KI, ob ein Block gegen einen angrenzenden Gegner
   eine bessere Chance bietet; sonst bricht sie die Bewegung lieber ab, statt
   das Risiko einzugehen.
+- **Konservativer Einsatz von Extrafeldern** (`aiExtraSquareBudget`, siehe
+  Abschnitt 4 zu Extrafeldern): Die KI riskiert SP-Verlust und Sturz nur, wenn
+  sich dadurch ein klarer Vorteil ergibt, nicht um bloß die Distanz zu einem
+  Ziel zu verringern:
+  - als eigener Ballträger nur, um tatsächlich aus der Bedrohungsreichweite
+    eines Gegners zu entkommen (`isThreatenedPosition`, Näherung: gegnerische
+    MR + 1 Feld) – nicht für zusätzliche Vorwärtsbewegung, wenn schon sicher;
+  - gegen den gegnerischen Ballträger nur, wenn das tatsächlich in
+    Blockreichweite (angrenzend) bringt, nicht nur näher heran;
+  - bei einem losen Ball nur, wenn er dadurch in diesem Zug noch aufgenommen
+    werden kann;
+  - beim Eskortieren des eigenen Ballträgers werden grundsätzlich keine
+    Extrafelder eingesetzt (kein klarer Sofortvorteil definiert).
+  Genutzt wird dabei stets die minimal nötige Anzahl an Extrafeldern, nicht
+  automatisch das verfügbare Maximum.
 - KI passt **nicht** selbst (keine Wurf-Entscheidungslogik implementiert).
 - Reihenfolge: eigener Ballträger zuerst, dann nach Nähe zum Ball sortiert.
 
@@ -288,12 +306,15 @@ schwerer als normal.
   Relevant, sobald ein Manager-Teil mit Kader über mehrere Spiele hinweg
   existieren soll.
 - RW und SP fließen in den Verletzungscheck (siehe 7b) und in Extrafelder
-  (siehe Abschnitt 4) ein. Es gibt aber kein Regenerations- oder generelles
-  Erschöpfungssystem: SP kann durch Extrafelder auf 0 oder darunter fallen,
-  ohne dass das (anders als beim Verletzungscheck) automatisch "verletzt"
-  auslöst – ein Spieler mit sehr niedrigen/negativen SP kann also weiterhin
-  ganz normal spielen, nur eben keine (oder nur noch wenige) Extrafelder mehr
-  gehen.
+  (siehe Abschnitt 4) ein. SP regeneriert bislang nur nach einem Touchdown
+  (siehe Abschnitt 11, `regenerateStaminaAfterTouchdown`), sonst gibt es kein
+  Erschöpfungssystem darüber hinaus: SP kann durch Extrafelder auf 0 oder
+  darunter fallen, ohne dass das (anders als beim Verletzungscheck)
+  automatisch "verletzt" auslöst – ein Spieler mit sehr niedrigen/negativen SP
+  kann weiterhin ganz normal spielen, nur eben keine (oder nur noch wenige)
+  Extrafelder mehr gehen. Da die Touchdown-Regeneration nur für `SP > 0`
+  greift, regeneriert ein Spieler, der exakt bei 0 oder darunter steht, dabei
+  nicht mehr – ein Grenzfall, den die aktuelle Regel wörtlich so vorgibt.
 - **Skills** sind als System angelegt (`POSITIONS[...].skills`, `player.skills`,
   `hasSkill`), bislang für Läufer (Blitz), Blocker (Block) und Fänger (Dodge)
   belegt. Werfer hat noch keinen eigenen Skill – vorgesehen als nächster Schritt.

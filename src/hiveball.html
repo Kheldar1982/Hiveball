@@ -335,6 +335,7 @@ function createPlayer(id, number, team, position, x, y) {
     pa: stats.pa,
     rw: stats.co + ARMOR_BONUS,
     sp: stats.co * STAMINA_MULTIPLIER,
+    spMax: stats.co * STAMINA_MULTIPLIER,
     skills: [...stats.skills],
     prone: false,
     injured: false,
@@ -783,12 +784,25 @@ function tryPickupBall(player) {
   }
 }
 
+// Nach jedem Touchdown ruhen sich alle noch im Spiel befindlichen Spieler (SP > 0)
+// kurz aus: SP steigt um den eigenen CO-Wert, aber nie über spMax (den Startwert) hinaus.
+function regenerateStaminaAfterTouchdown() {
+  players.filter(p => p.sp > 0).forEach(p => {
+    const spBefore = p.sp;
+    p.sp = Math.min(p.spMax, p.sp + p.co);
+    if (p.sp !== spBefore) {
+      log(`${teams[p.team].name} #${p.number} ruht sich aus: SP ${spBefore} → ${p.sp} (+CO ${p.co}).`);
+    }
+  });
+}
+
 function checkScore(player) {
   if (ball.carrierId !== player.id) return false;
   if (player.x === teams[player.team].endzoneCol) {
     teams[player.team].score++;
     log(`🏈 TOUCHDOWN für ${teams[player.team].name}!`);
     updateScoreboard();
+    regenerateStaminaAfterTouchdown();
     if (teams[player.team].score >= WIN_SCORE) {
       endGame(`${teams[player.team].name} gewinnt mit ${WIN_SCORE} Touchdowns!`);
     } else {
@@ -1339,6 +1353,58 @@ function findBestBlockOption(p) {
   return best;
 }
 
+// Ermittelt den Punkt auf 'path', den p nach genau 'steps' Schritten ab seiner
+// aktuellen Position erreicht hätte (0 Schritte = aktuelle Position von p).
+function pathPointAfterSteps(p, path, steps) {
+  const idx = Math.min(steps, path.length) - 1;
+  return idx >= 0 ? path[idx] : { x: p.x, y: p.y };
+}
+
+// Grobe Näherung: Bedroht irgendein gegnerischer Spieler die Position (x,y), weil er
+// sie in seinem nächsten Zug erreichen und dort angrenzend blocken könnte? Ignoriert
+// dabei mögliche eigene Extrafelder des Gegners (bewusst konservative Näherung).
+function isThreatenedPosition(x, y, team) {
+  return players.some(e =>
+    e.team !== team && !e.prone && !e.injured &&
+    chebyshev(e.x, e.y, x, y) <= e.mr + 1
+  );
+}
+
+// Die KI setzt Extrafelder bewusst konservativ ein: nur wenn sie dadurch tatsächlich
+// einen klaren Vorteil erreicht – nicht bloß, um die Distanz zu einem Ziel zu verringern,
+// ohne den eigentlichen Zweck zu erfüllen. Als Vorteil gilt:
+// - als eigener Ballträger aus der Bedrohungsreichweite eines Gegners entkommen (kein
+//   Blitz mehr möglich),
+// - den gegnerischen Ballträger tatsächlich in Blockreichweite (angrenzend) erreichen,
+// - einen losen Ball in diesem Zug tatsächlich noch aufnehmen.
+// Eskortiert der Spieler nur den eigenen Ballträger, werden grundsätzlich keine
+// Extrafelder genutzt (kein klarer Sofortvorteil). Gibt die minimal nötige Anzahl an
+// Extrafeldern zurück (0, falls keine Extrafelder von Vorteil sind).
+function aiExtraSquareBudget(p, fullPath) {
+  const maxExtra = availableExtraSquares(p);
+  if (maxExtra === 0) return 0;
+
+  const isBallCarrier = ball.carrierId === p.id;
+  const looseBall = ball.carrierId === null;
+  const carrier = (!isBallCarrier && !looseBall) ? players.find(x => x.id === ball.carrierId) : null;
+  const isBlockingEnemyCarrier = !!carrier && carrier.team !== p.team;
+
+  if (!isBallCarrier && !looseBall && !isBlockingEnemyCarrier) return 0;
+
+  const goalReached = (steps) => {
+    const pt = pathPointAfterSteps(p, fullPath, p.movesLeft + steps);
+    if (isBallCarrier) return !isThreatenedPosition(pt.x, pt.y, p.team);
+    if (looseBall) return pt.x === ball.x && pt.y === ball.y;
+    return chebyshev(pt.x, pt.y, carrier.x, carrier.y) === 1;
+  };
+
+  if (goalReached(0)) return 0; // Ziel/Sicherheit schon mit regulären MR erreicht -> keine Extrafelder nötig
+  for (let n = 1; n <= maxExtra; n++) {
+    if (goalReached(n)) return n;
+  }
+  return 0; // auch mit allen verfügbaren Extrafeldern kein Vorteil -> keine nutzen
+}
+
 // Bewegt einen KI-Spieler vorsichtig Richtung (destX,destY): bricht die Bewegung ab,
 // sobald ein Schritt eine Dodge-Erfolgschance < 50% hätte – und blockt in diesem Fall
 // lieber einen angrenzenden Gegner, falls das eine bessere Erfolgschance bietet.
@@ -1348,7 +1414,7 @@ function aiAdvanceCarefully(p, destX, destY) {
   // Das eigentliche Ziel (z.B. der Ball) liegt oft weiter weg, als die Bewegungspunkte
   // dieses Zuges reichen. Wir suchen daher zunächst den besten Gesamtweg über das ganze
   // Feld (Suchradius = Feldgröße reicht überall hin) und laufen davon nur so viele
-  // Schritte, wie movesLeft erlaubt.
+  // Schritte, wie movesLeft (plus ggf. konservativ eingesetzte Extrafelder) erlaubt.
   const fullPath = findSmartPath(p.x, p.y, destX, destY, p.team, COLS + ROWS);
   if (!fullPath) {
     log(`#${p.number} findet keinen gangbaren Weg zum Ziel (${destX},${destY}).`);
@@ -1356,13 +1422,17 @@ function aiAdvanceCarefully(p, destX, destY) {
     draw();
     return;
   }
-  const path = fullPath.slice(0, p.movesLeft + availableExtraSquares(p));
+  const extraBudget = aiExtraSquareBudget(p, fullPath);
+  if (extraBudget > 0) {
+    log(`#${p.number} setzt bei Bedarf bis zu ${extraBudget} Extrafeld(er) ein (klarer taktischer Vorteil erkannt).`);
+  }
+  const path = fullPath.slice(0, p.movesLeft + extraBudget);
 
   let extraSquaresUsed = 0;
 
   for (const step of path) {
     const usingExtraSquare = p.movesLeft <= 0;
-    if (usingExtraSquare && (extraSquaresUsed >= MAX_EXTRA_SQUARES || p.sp < EXTRA_SQUARE_SP_COST)) break;
+    if (usingExtraSquare && (extraSquaresUsed >= extraBudget || p.sp < EXTRA_SQUARE_SP_COST)) break;
 
     const risk = findRiskiestTackle(p, step.x, step.y);
     if (risk) {
