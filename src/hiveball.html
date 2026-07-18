@@ -162,6 +162,7 @@
     <div id="status">Wähle einen blauen Spieler aus.</div>
 
     <button id="btn-block" disabled>Block ausführen</button>
+    <button id="btn-foul" disabled>Foul</button>
     <button id="btn-pass" disabled>Passen</button>
     <button id="btn-endturn" class="secondary">Zug beenden</button>
 
@@ -173,7 +174,7 @@
       <b>Steuerung:</b><br>
       1. Spieler anklicken (blau, nicht erschöpft)<br>
       2. Grün markiertes Feld anklicken = bewegen<br>
-      3. Gegner direkt neben deinem Spieler anklicken = blocken<br>
+      3. Gegner direkt neben deinem Spieler anklicken = blocken (stehend) bzw. foulen (liegend)<br>
       4. "Passen" klicken, dann Mitspieler anklicken = Ball anspielen<br>
       5. "Zug beenden" wenn fertig
       <br><br>
@@ -215,6 +216,9 @@ let ball = { x: 0, y: 0, carrierId: null };
 let currentTeam = TEAM_BLUE;
 let selectedPlayerId = null;
 let passMode = false;
+// Pro Zug darf nur ein Spieler ein Foul durchführen (unabhängig vom Ausgang) – wird bei
+// jedem Zugwechsel in endTurn() zurückgesetzt.
+let foulUsedThisTurn = false;
 
 // Spielende-Regeln: Sieg ab WIN_SCORE Touchdowns, sonst Ende nach MAX_TURNS_PER_TEAM
 // Zügen pro Team (bei Gleichstand Unentschieden).
@@ -316,6 +320,11 @@ function attemptExtraSquare(p, stepNumber) {
   return false;
 }
 
+// Zielwert für den Entdeckungswurf beim Foul (siehe resolveFoul). Bewusst niedrig
+// angesetzt, damit die Entdeckungschance stark vom AG-Wert und vom angerichteten
+// Schaden abhängt statt generell hoch zu sein.
+const ZIELWERT_FOUL = 4;
+
 /* ============================================================
    SPIEL AUFSETZEN
    ============================================================ */
@@ -339,6 +348,11 @@ function createPlayer(id, number, team, position, x, y) {
     skills: [...stats.skills],
     prone: false,
     injured: false,
+    // sentOff: rein informatives Flag für ein Foul mit Entdeckung (siehe resolveFoul) –
+    // der Spieler verlässt das Feld genau wie ein Verletzter (injured wird ebenfalls
+    // gesetzt), erleidet dabei aber keinen SP-Schaden. Unterscheidung für spätere
+    // Statistik/den Manager-Teil, spielmechanisch ohne eigene Bedeutung.
+    sentOff: false,
     acted: false
   };
 }
@@ -821,6 +835,7 @@ function endGame(message) {
   log(`🏁 ${message}`);
   setStatus(`🏁 ${message}`);
   document.getElementById('btn-block').disabled = true;
+  document.getElementById('btn-foul').disabled = true;
   document.getElementById('btn-pass').disabled = true;
   document.getElementById('btn-endturn').disabled = true;
   draw();
@@ -1202,6 +1217,82 @@ function resolveBlock(attacker, defender) {
   }
 }
 
+// Berechnet für ein mögliches Foul den exakten Erwartungswert des angerichteten Schadens
+// sowie die Entdeckungswahrscheinlichkeit – über alle 10x10 möglichen Kombinationen aus
+// Verletzungswurf und Entdeckungswurf (siehe resolveFoul für die zugrunde liegenden
+// Formeln). Wird von der KI genutzt, um zu entscheiden, ob sich ein Foul lohnt (aiTurn).
+function evaluateFoulOutcome(attacker, victim) {
+  let damageSum = 0;
+  let caughtCount = 0;
+
+  for (let injuryRaw = 1; injuryRaw <= 10; injuryRaw++) {
+    const damage = Math.max(0, injuryRaw + attacker.st - victim.rw);
+    damageSum += damage;
+
+    const discoveryTarget = ZIELWERT_FOUL + Math.floor(damage / 2);
+    for (let discoveryRaw = 1; discoveryRaw <= 10; discoveryRaw++) {
+      let success;
+      if (discoveryRaw === 10) success = true;
+      else if (discoveryRaw === 1) success = false;
+      else success = (discoveryRaw + attacker.ag) >= discoveryTarget;
+      if (!success) caughtCount++;
+    }
+  }
+
+  return { expectedDamage: damageSum / 10, catchChance: caughtCount / 100 };
+}
+
+// Foul: ein stehender, nicht erschöpfter Spieler foult einen angrenzenden liegenden
+// Gegner. Zählt als die eine Aktion des Zuges (acted-Flag), wie Block/Pass.
+// Die KI (Rot) foult, wenn sich das laut evaluateFoulOutcome lohnt (siehe aiTurn);
+// wirft dabei aber weiterhin nicht selbst (keine Pass-Entscheidungslogik implementiert).
+function resolveFoul(attacker, victim) {
+  logAction(`Foul: ${teams[attacker.team].name} #${attacker.number} vs ${teams[victim.team].name} #${victim.number}`, '🥾', attacker.team);
+
+  // Nur ein Foul pro Zug, unabhängig vom Ausgang dieser Aktion.
+  foulUsedThisTurn = true;
+
+  // 1) Verletzungscheck: exakt dieselbe Formel wie beim Block (siehe resolveInjuryCheck) –
+  // W10 + ST des Foulenden vs. RW des Opfers, Differenz kostet SP. Kein Opposed-Wurf und
+  // keine Krit-10/Krit-1-Sonderregel auf Seiten des Opfers: es liegt bereits am Boden und
+  // wehrt sich nicht.
+  const injuryResult = resolveInjuryCheck(attacker, victim);
+  log(`Verletzungscheck – ${teams[attacker.team].name} #${attacker.number}: ${injuryResult.desc}`);
+
+  if (injuryResult.injured) {
+    victim.injured = true;
+    setStatus(`Spieler ${victim.number} wird beim Foul verletzt und scheidet aus!`);
+    log(`🚑 Spieler ${victim.number} (${teams[victim.team].name}) ist verletzt und verlässt das Feld.`);
+  } else {
+    setStatus(`Spieler ${victim.number} übersteht das Foul.`);
+  }
+
+  // 2) Entdeckungswurf: AG des Foulenden (Heimlichkeit) gegen ZIELWERT_FOUL, erschwert um
+  // die Hälfte des soeben angerichteten Schadens (Brutalität). Krit-10/Krit-1 gelten hier
+  // ganz normal (bereits in rollAgainstTarget eingebaut). Design-Begründung für diesen
+  // Trade-off zwischen Positionen: siehe README.
+  const discoveryResult = rollAgainstTarget(
+    [{ label: 'AG', value: attacker.ag }],
+    ZIELWERT_FOUL,
+    [{ label: 'Schadensfolge', value: Math.floor(injuryResult.damage / 2) }]
+  );
+  log(`Entdeckungswurf – ${teams[attacker.team].name} #${attacker.number}: ${discoveryResult.desc}`);
+
+  attacker.acted = true;
+
+  if (!discoveryResult.success) {
+    // Platzverweis: verlässt das Feld wie ein Verletzter (injured), erleidet dabei aber
+    // keinen eigenen SP-Schaden. sentOff ist ein rein informatives Zusatzflag, um das
+    // später (z.B. im Manager-Teil) von einer echten Verletzung unterscheiden zu können.
+    attacker.injured = true;
+    attacker.sentOff = true;
+    setStatus(`Spieler ${attacker.number} wird beim Foul erwischt und vom Platz gestellt!`);
+    log(`🟥 Spieler ${attacker.number} (${teams[attacker.team].name}) wird erwischt und vom Platz gestellt.`);
+  }
+
+  draw();
+}
+
 /* ============================================================
    ZUG-STEUERUNG
    ============================================================ */
@@ -1214,9 +1305,11 @@ function endTurn(forced) {
   selectedPlayerId = null;
   passMode = false;
   document.getElementById('btn-block').disabled = true;
+  document.getElementById('btn-foul').disabled = true;
   document.getElementById('btn-pass').disabled = true;
 
   currentTeam = 1 - currentTeam;
+  foulUsedThisTurn = false;
   players.forEach(p => {
     if (p.team === currentTeam) {
       p.movesLeft = p.mr;
@@ -1508,6 +1601,23 @@ function aiTurn() {
         if (gameEnded || currentTeam !== TEAM_RED) return;
       }
     }
+
+    // Foul versuchen, wenn ein liegender Gegner direkt angrenzt und sich das laut
+    // evaluateFoulOutcome lohnt: erwarteter Schaden > Entdeckungsrisiko. Nur ein Foul
+    // pro Zug erlaubt (foulUsedThisTurn), auch für die KI.
+    if (!p.acted && !foulUsedThisTurn) {
+      const proneAdjEnemies = players.filter(e => e.team === TEAM_BLUE && e.prone && !e.injured && isAdjacent(p, e));
+      if (proneAdjEnemies.length) {
+        const target = proneAdjEnemies.find(e => e.id === ball.carrierId) || proneAdjEnemies[0];
+        const outcome = evaluateFoulOutcome(p, target);
+        if (outcome.expectedDamage > outcome.catchChance) {
+          log(`#${p.number} erwägt ein Foul gegen #${target.number}: erwarteter Schaden ` +
+            `${outcome.expectedDamage.toFixed(1)} vs. Entdeckungsrisiko ${Math.round(outcome.catchChance * 100)}% – lohnt sich.`);
+          resolveFoul(p, target);
+          if (gameEnded || currentTeam !== TEAM_RED) return;
+        }
+      }
+    }
   }
 
   draw();
@@ -1516,7 +1626,9 @@ function aiTurn() {
 
 function updateActionButtons(p) {
   const canBlock = players.some(e => e.team === TEAM_RED && !e.prone && !e.injured && isAdjacent(p, e));
+  const canFoul = players.some(e => e.team === TEAM_RED && e.prone && !e.injured && isAdjacent(p, e));
   document.getElementById('btn-block').disabled = !canBlock || p.acted;
+  document.getElementById('btn-foul').disabled = !canFoul || p.acted || foulUsedThisTurn;
   document.getElementById('btn-pass').disabled = !(ball.carrierId === p.id) || p.acted;
 }
 
@@ -1655,6 +1767,27 @@ function previewBlockPreview(attacker, defender) {
   return html;
 }
 
+function previewFoulPreview(attacker, victim) {
+  // Verletzungscheck ist kein Opposed-Wurf (siehe resolveInjuryCheck): "verletzt" bedeutet
+  // W10 + ST - RW >= aktuelle SP des Opfers, umgestellt also W10 >= SP + RW - ST.
+  const injuryTarget = victim.sp + victim.rw;
+  const injuryRoll = neededRoll(injuryTarget, attacker.st);
+
+  // Der Entdeckungswurf hängt vom tatsächlich angerichteten Schaden ab, der erst nach dem
+  // Verletzungswurf feststeht – zeige daher die Bandbreite zwischen keinem und maximalem
+  // Schaden (W10 = 10 beim Verletzungscheck).
+  const maxDamage = Math.max(0, (10 + attacker.st) - victim.rw);
+  const discoveryNoDamage = neededRoll(ZIELWERT_FOUL, attacker.ag);
+  const discoveryMaxDamage = neededRoll(ZIELWERT_FOUL + Math.floor(maxDamage / 2), attacker.ag);
+
+  return `<b>🥾 Foul gegen #${victim.number}</b><br>` +
+    `<u>Verletzungscheck</u>: W10 + ST ${attacker.st} vs RW ${victim.rw} (aktuell SP ${victim.sp})<br>` +
+    `benötigt Wurf ≥ ${injuryRoll.needed}${injuryRoll.note}, damit #${victim.number} sofort verletzt wird.<br><br>` +
+    `<u>Entdeckungswurf</u>: AG ${attacker.ag} gegen Ziel ${ZIELWERT_FOUL} + halber Schaden<br>` +
+    `benötigt Wurf ≥ ${discoveryNoDamage.needed}${discoveryNoDamage.note} (ohne Schaden) bis ` +
+    `≥ ${discoveryMaxDamage.needed}${discoveryMaxDamage.note} (max. Schaden), um unentdeckt zu bleiben.`;
+}
+
 function previewPassPreview(passer, receiver) {
   const fields = fieldsCrossed(passer.x, passer.y, receiver.x, receiver.y);
   if (fields > 9) {
@@ -1699,6 +1832,14 @@ function updateHoverPreview(x, y) {
   if (sel && !sel.prone) {
     if (hovered && hovered.team === TEAM_RED && !hovered.prone && !hovered.injured && isAdjacent(sel, hovered)) {
       setPreview(previewBlockPreview(sel, hovered));
+      return;
+    }
+    if (hovered && hovered.team === TEAM_RED && hovered.prone && !hovered.injured && isAdjacent(sel, hovered)) {
+      if (foulUsedThisTurn) {
+        setPreview('In diesem Zug wurde bereits gefoult – nur ein Foul pro Zug erlaubt.');
+      } else {
+        setPreview(previewFoulPreview(sel, hovered));
+      }
       return;
     }
     if (!hovered) {
@@ -1775,12 +1916,20 @@ canvas.addEventListener('click', (e) => {
     return;
   }
 
-  // Gegner anklicken -> Block, falls adjazent
+  // Gegner anklicken -> Foul (falls liegend) oder Block (falls stehend), jeweils adjazent
   if (clicked && clicked.team === TEAM_RED) {
-    if (isAdjacent(sel, clicked) && !sel.acted) {
-      resolveBlock(sel, clicked);
-    } else {
+    if (!isAdjacent(sel, clicked)) {
       setStatus('Dieser Gegner ist nicht direkt neben deinem Spieler.');
+    } else if (!sel.acted) {
+      if (clicked.prone) {
+        if (foulUsedThisTurn) {
+          setStatus('In diesem Zug wurde bereits gefoult – nur ein Foul pro Zug erlaubt.');
+        } else {
+          resolveFoul(sel, clicked);
+        }
+      } else {
+        resolveBlock(sel, clicked);
+      }
     }
     return;
   }
@@ -1799,6 +1948,13 @@ document.getElementById('btn-block').addEventListener('click', () => {
   if (!sel) return;
   const enemy = players.find(e => e.team === TEAM_RED && !e.prone && !e.injured && isAdjacent(sel, e));
   if (enemy) { resolveBlock(sel, enemy); if (currentTeam === TEAM_BLUE) updateActionButtons(sel); }
+});
+
+document.getElementById('btn-foul').addEventListener('click', () => {
+  const sel = players.find(p => p.id === selectedPlayerId);
+  if (!sel || sel.acted || foulUsedThisTurn) return;
+  const victim = players.find(e => e.team === TEAM_RED && e.prone && !e.injured && isAdjacent(sel, e));
+  if (victim) { resolveFoul(sel, victim); if (currentTeam === TEAM_BLUE) updateActionButtons(sel); }
 });
 
 document.getElementById('btn-pass').addEventListener('click', () => {

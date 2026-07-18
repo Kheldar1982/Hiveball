@@ -211,8 +211,58 @@ der stürzende Tackler selbst).
   **am Boden** und steht regulär wieder auf.
 - Kein Opposed-Wurf – der Verlierer würfelt hier selbst nicht mit, es gibt
   daher keine Krit-10/Krit-1-Sonderregel auf dieser Seite.
-- SP werden nur durch diesen Check verringert; es gibt (noch) keine
-  Regeneration oder sonstigen Verbrauch.
+- SP werden außerdem durch Extrafelder verringert (Abschnitt 4) und durch
+  Foul (7c) – dort mit derselben Formel, aber ohne dass ein Sturz die
+  Vorbedingung ist. Regeneration gibt es bislang nur nach einem Touchdown
+  (Abschnitt 11).
+
+## 7c. Foul
+
+Ein stehender, nicht erschöpfter (`!acted`) Spieler kann einen angrenzenden,
+**liegenden** Gegner foulen (`resolveFoul(attacker, victim)`). Zählt als die
+eine erlaubte Aktion des Zuges, genau wie Block oder Pass. Auslösen entweder
+über den Button "Foul" oder per Klick direkt auf den liegenden Gegner (ein
+Klick auf einen angrenzenden Gegner blockt bei stehenden und fault bei
+liegenden Zielen).
+
+**Limit: nur ein Foul pro Zug.** Unabhängig davon, wie viele eigene Spieler
+noch nicht agiert haben, darf pro Zug insgesamt nur einmal gefoult werden
+(`foulUsedThisTurn`, wird bei jedem Zugwechsel in `endTurn()` zurückgesetzt).
+Das Flag wird gesetzt, sobald `resolveFoul` läuft – unabhängig vom Ausgang
+(auch ein unentdecktes oder folgenloses Foul verbraucht das Limit). Gilt
+gleichermaßen für Button, Direktklick und die KI-Entscheidung; ist das Limit
+bereits ausgeschöpft, zeigen Button/Vorschau/Klick einen entsprechenden
+Hinweis statt der Aktion.
+
+1. **Verletzungscheck:** exakt dieselbe Formel wie der reguläre
+   Verletzungscheck (Abschnitt 7b, `resolveInjuryCheck(attacker, victim)`) –
+   W10 + ST des Foulenden vs. RW des Opfers, Differenz kostet dessen SP,
+   SP ≤ 0 = verletzt. Kein Opposed-Wurf, keine Krit-10/Krit-1-Sonderregel
+   (das Opfer liegt bereits am Boden und wehrt sich nicht).
+2. **Entdeckungswurf** (`rollAgainstTarget`, danach, mit dem Schaden aus
+   Schritt 1): AG des Foulenden gegen `ZIELWERT_FOUL = 4`, erschwert um
+   `Math.floor(Schaden / 2)`. Erfolg = Foul bleibt unentdeckt. Fehlschlag =
+   Platzverweis: der Foulende scheidet aus wie ein Verletzter (`injured =
+   true`), erleidet dabei aber selbst **keinen** SP-Schaden. Zur
+   Unterscheidung von einer echten Verletzung (z.B. für eine spätere
+   Statistik/den Manager-Teil) wird zusätzlich `sentOff = true` gesetzt –
+   spielmechanisch hat dieses Flag aktuell keine eigene Bedeutung, der
+   Spieler wird exakt wie ein Verletzter vom Feld genommen. Hier gilt
+   Krit-10/Krit-1 ganz normal (in `rollAgainstTarget` eingebaut).
+
+**Design-Entscheidung – Trade-off zwischen Positionen:** Der Entdeckungswurf
+kombiniert bewusst AG (Heimlichkeit) mit dem halbierten Schaden aus Schritt 1
+(Brutalität). Dadurch ergibt sich ein Positions-Trade-off: ein Blocker (hohe
+ST, niedrige AG) richtet im Foul viel Schaden an, wird aber deutlich öfter
+erwischt; ein Fänger/Läufer (hohe AG, niedrige ST) foult "sauberer" – kaum
+Schaden, aber auch ein deutlich geringeres Entdeckungsrisiko. Bei Zielwert 4
+liegt das Grundrisiko (ohne Schadensfolge) bei ca. 30 % Entdeckung für einen
+durchschnittlichen Wert, das durch angerichteten Schaden weiter steigt.
+
+**KI:** Rot erwägt ein Foul, wenn ein liegender blauer Gegner direkt angrenzt
+und noch keine Aktion in diesem Zug stattgefunden hat (`evaluateFoulOutcome`,
+siehe Abschnitt 12). Gibt es mehrere liegende Gegner, hat der Ballträger
+Priorität (analog zur Block-Zielwahl).
 
 ## 8. Pass & Fangen
 
@@ -282,6 +332,16 @@ schwerer als normal.
   Genutzt wird dabei stets die minimal nötige Anzahl an Extrafeldern, nicht
   automatisch das verfügbare Maximum.
 - KI passt **nicht** selbst (keine Wurf-Entscheidungslogik implementiert).
+- **Foul-Entscheidung** (`evaluateFoulOutcome`, siehe 7c): Grenzt ein liegender
+  blauer Gegner an und hat der Rot-Spieler noch keine Aktion in diesem Zug
+  ausgeführt, wird das Foul exakt bewertet – über alle 10×10 möglichen
+  Kombinationen aus Verletzungs- und Entdeckungswurf werden der erwartete
+  Schaden (SP-Verlust im Schnitt) und die Entdeckungswahrscheinlichkeit
+  berechnet. Die KI foult, wenn der erwartete Schaden das Entdeckungsrisiko
+  übersteigt (`expectedDamage > catchChance`, Schaden in SP-Punkten direkt
+  gegen die Wahrscheinlichkeit 0–1 verglichen – eine bewusst einfache
+  Heuristik statt einer echten Kosten-Nutzen-Umrechnung). Gibt es mehrere
+  liegende Gegner, hat der Ballträger Priorität (wie bei der Blockzielwahl).
 - Reihenfolge: eigener Ballträger zuerst, dann nach Nähe zum Ball sortiert.
 
 ## 13. UI/UX-Konventionen
@@ -319,6 +379,9 @@ schwerer als normal.
   `hasSkill`), bislang für Läufer (Blitz), Blocker (Block) und Fänger (Dodge)
   belegt. Werfer hat noch keinen eigenen Skill – vorgesehen als nächster Schritt.
 - KI wirft nicht selbst (keine Pass-Entscheidungslogik für Rot).
+- `sentOff` (siehe 7c) ist rein informativ und wird aktuell nirgends
+  ausgewertet – vorgesehen für eine spätere Statistik/den Manager-Teil, um
+  Platzverweise von echten Verletzungen unterscheiden zu können.
 
 ## Projektstruktur
 
