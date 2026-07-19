@@ -96,6 +96,13 @@ export const defaultLeagueConfig = {
       Werfer: 55000,
       Fänger: 60000,
       Läufer: 65000
+    },
+    // Marktwert = Kaufwert (Basispreis der Position) + Aufschläge für
+    // Fortschritt gegenüber dem Positions-Grundzustand (siehe formulas.js
+    // calculateMarketValue). Ersetzt den reinen Phase-3-Platzhalter.
+    marketValue: {
+      perExtraAttributePoint: 2500,
+      perExtraSkill: 10000
     }
     // ticketIncome, fanshopIncome etc. folgen in Phase 2
   },

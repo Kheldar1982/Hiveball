@@ -11,6 +11,7 @@
 
 import { POSITIONS_MANAGER_EXT } from './positions.js';
 import { defaultLeagueConfig } from './leagueConfig.js';
+import { calculateMarketValue } from './formulas.js';
 
 function createId() {
   return crypto.randomUUID();
@@ -23,7 +24,7 @@ export function createManagerPlayer({ position, name, clubId, number, age = defa
   const base = POSITIONS_MANAGER_EXT[position];
   if (!base) throw new Error(`Unbekannte Position: ${position}`);
 
-  return {
+  const player = {
     playerId: createId(),
     clubId,
     name,
@@ -54,11 +55,13 @@ export function createManagerPlayer({ position, name, clubId, number, age = defa
       severity: null
     },
 
-    // Basis-Platzhalter (Aufschläge/volle Formel erst Phase 3, siehe Spezifikation 3 Offene Punkte)
-    marketValue: base.price,
+    marketValue: 0, // unten per calculateMarketValue gesetzt (braucht attributes/skills)
     retired: false,
     status: 'aktiv'
   };
+
+  player.marketValue = calculateMarketValue(player, defaultLeagueConfig);
+  return player;
 }
 
 // Erzeugt einen neuen Club (Spezifikation 2.2) mit Startkapital und
