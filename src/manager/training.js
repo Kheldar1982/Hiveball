@@ -1,8 +1,8 @@
-// Rep-basiertes Attributwachstum (Phasenplan Phase 1b, Spezifikation 3.1/3.2).
-// Wandelt gesammelte Reps in "trainingsbereit"-Einträge in
-// club.trainingQueue.physical um. Das eigentliche Verbrauchen der Reps und
-// Erhöhen von attributes[attr].current passiert erst beim Training selbst
-// (Phase 1c-Physisch) – hier nur Reps-Sammlung + Schwellen-Erkennung.
+// Rep-basiertes Attributwachstum (Phasenplan Phase 1b, Spezifikation 3.1/3.2)
+// plus das eigentliche physische Training (Phase 1c-Physisch): Verbrauchen
+// eines Warteschlangen-Eintrags gegen einen Trainings-Slot im
+// Trainingsgebäude (siehe training.html). Slot-Zuteilung/-Limits pro Spieler
+// sind reine UI-Logik dort, hier nur die eigentliche Attributerhöhung.
 
 import { POSITIONS_MANAGER_EXT } from './positions.js';
 import { defaultLeagueConfig } from './leagueConfig.js';
@@ -40,6 +40,29 @@ export function creditReps(player, club, attr, rawReps, config = defaultLeagueCo
     }
   }
 
+  savePlayer(player);
+  return player;
+}
+
+// Verarbeitet einen einzelnen Warteschlangen-Eintrag (Trainingsgebäude,
+// Phase 1c-Physisch): erhöht das Attribut um 1, reduziert die gesammelten
+// Reps um die dafür verbrauchte Schwelle (Überschuss bleibt erhalten, siehe
+// Spezifikation 2.1) und entfernt den Eintrag aus der Warteschlange.
+export function trainPhysicalAttribute(player, club, attr, config = defaultLeagueConfig) {
+  const index = club.trainingQueue.physical.findIndex(
+    (entry) => entry.playerId === player.playerId && entry.attribute === attr
+  );
+  if (index === -1) {
+    throw new Error(`${player.name} steht für ${attr.toUpperCase()} nicht in der Trainingswarteschlange`);
+  }
+
+  const threshold = repThreshold(nextStepFor(player, attr), config);
+  player.attributes[attr].current += 1;
+  player.reps[attr] -= threshold;
+
+  club.trainingQueue.physical.splice(index, 1);
+
+  saveClub(club);
   savePlayer(player);
   return player;
 }
