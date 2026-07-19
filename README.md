@@ -389,9 +389,14 @@ schwerer als normal.
 hiveball/
 ├── README.md                                   ← dieses Dokument
 ├── src/
-│   └── hiveball.html                           ← einziger Prototyp (HTML/CSS/JS, keine Deps)
+│   ├── hiveball.html                           ← Kernspiel-Prototyp (HTML/CSS/JS, keine Deps)
+│   └── manager/                                ← Manager-Teil, im Aufbau (siehe Spezifikation)
+│       ├── leagueConfig.js                     ← Default-Konfiguration der Liga
+│       ├── positions.js                        ← Positions-/Preistabelle inkl. Lineman
+│       └── state.js                            ← Datenmodell (ManagerPlayer, Club)
 └── docs/
-    └── Hiveball_Manager_Regelwerk_v0_12.pdf     ← ursprüngliches Design-/Regeldokument
+    ├── Hiveball_Manager_Regelwerk_v0_12.pdf     ← ursprüngliches Design-/Regeldokument
+    └── hiveball_manager_spezifikation.md        ← technische Spezifikation Manager-Teil
 ```
 
 ## Hinweis zur Weiterentwicklung
