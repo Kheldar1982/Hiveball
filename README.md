@@ -391,9 +391,14 @@ hiveball/
 ├── src/
 │   ├── hiveball.html                           ← Kernspiel-Prototyp (HTML/CSS/JS, keine Deps)
 │   └── manager/                                ← Manager-Teil, im Aufbau (siehe Spezifikation)
+│       ├── index.html                          ← minimale Kader-UI (Verein anlegen, Spieler/Skills kaufen)
 │       ├── leagueConfig.js                     ← Default-Konfiguration der Liga
 │       ├── positions.js                        ← Positions-/Preistabelle inkl. Lineman
-│       └── state.js                            ← Datenmodell (ManagerPlayer, Club)
+│       ├── state.js                            ← Datenmodell (ManagerPlayer, Club) + Persistenz
+│       ├── formulas.js                         ← Formeln: Marktwert, Skill-Preis/-Limit
+│       ├── transferMarket.js                   ← einfacher Transfermarkt (Spieler kaufen)
+│       ├── economy.js                          ← Vereinskasse (Gehälter, Siegprämie)
+│       └── skills.js                           ← EP-für-Skills (Skill-Kauf gegen XP)
 └── docs/
     ├── Hiveball_Manager_Regelwerk_v0_12.pdf     ← ursprüngliches Design-/Regeldokument
     └── hiveball_manager_spezifikation.md        ← technische Spezifikation Manager-Teil

@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Hiveball Manager – Kader</title>
+<style>
+  body { font-family: sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td { border: 1px solid #ccc; padding: 0.35rem 0.5rem; text-align: left; font-size: 0.85rem; }
+  th { background: #f0f0f0; }
+  .error { color: #b00020; }
+  .money { font-weight: bold; }
+  .hint { color: #666; font-size: 0.85rem; }
+  input, select, button { font-size: 0.9rem; padding: 0.2rem 0.4rem; }
+</style>
+</head>
+<body>
+<h1>Hiveball Manager – Kader</h1>
+<p class="hint">
+  Bewusst minimale Oberfläche für den aktuellen Phase-1-Stand (Datenmodell,
+  Transfermarkt, EP-für-Skills). Kein Verkauf/Release, keine Vereinskasse-
+  Auszahlungen – die hängen am Matchende und folgen erst in Phase 1g.
+  Der "+50 XP"-Button ist ein reiner Debug-Behelf, damit sich EP-für-Skills
+  überhaupt testen lässt, solange es noch keine echte Post-Match-EP-Vergabe
+  gibt – kein Feature aus dem Konzept.
+</p>
+
+<div id="setup">
+  <p>Noch kein Verein angelegt.</p>
+  <input id="clubNameInput" placeholder="Vereinsname">
+  <button id="createClubBtn">Verein gründen</button>
+</div>
+
+<div id="clubView" hidden>
+  <h2 id="clubName"></h2>
+  <p>Kasse: <span class="money" id="clubMoney"></span> €</p>
+
+  <table id="rosterTable">
+    <thead>
+      <tr>
+        <th>#</th><th>Name</th><th>Position</th>
+        <th>MR</th><th>BL</th><th>ST</th><th>CO</th><th>AG</th><th>PA</th>
+        <th>Skills</th><th>Gebankt (ungetrainiert)</th><th>XP</th><th>Marktwert</th>
+        <th>Skill kaufen</th>
+      </tr>
+    </thead>
+    <tbody id="rosterBody"></tbody>
+  </table>
+
+  <h3>Spieler kaufen</h3>
+  <select id="signPosition"></select>
+  <input id="signName" placeholder="Name">
+  <button id="signBtn">Kaufen</button>
+
+  <p id="message"></p>
+</div>
+
+<script type="module">
+  import { createClub, loadClub, listClubIds, loadPlayers, saveClub, savePlayer } from './state.js';
+  import { signPlayer } from './transferMarket.js';
+  import { purchaseSkill } from './skills.js';
+  import { POSITIONS_MANAGER_EXT } from './positions.js';
+  import { defaultLeagueConfig } from './leagueConfig.js';
+
+  let club = null;
+
+  const el = (id) => document.getElementById(id);
+  const showMessage = (text, isError = false) => {
+    el('message').textContent = text;
+    el('message').className = isError ? 'error' : '';
+  };
+
+  function populatePositionSelect(selectEl) {
+    selectEl.innerHTML = '';
+    for (const position of Object.keys(POSITIONS_MANAGER_EXT)) {
+      const price = POSITIONS_MANAGER_EXT[position].price;
+      const opt = document.createElement('option');
+      opt.value = position;
+      opt.textContent = `${position} (${price} €)`;
+      selectEl.appendChild(opt);
+    }
+  }
+
+  function renderClub() {
+    el('setup').hidden = true;
+    el('clubView').hidden = false;
+    el('clubName').textContent = club.name;
+    el('clubMoney').textContent = club.money;
+    populatePositionSelect(el('signPosition'));
+
+    const roster = loadPlayers(club.roster);
+    const body = el('rosterBody');
+    body.innerHTML = '';
+
+    for (const player of roster) {
+      const tr = document.createElement('tr');
+
+      const skillSelect = document.createElement('select');
+      for (const skill of Object.keys(defaultLeagueConfig.xp.skillCosts)) {
+        const opt = document.createElement('option');
+        opt.value = skill;
+        opt.textContent = skill;
+        skillSelect.appendChild(opt);
+      }
+      const buySkillBtn = document.createElement('button');
+      buySkillBtn.textContent = 'Kaufen';
+      buySkillBtn.addEventListener('click', () => {
+        try {
+          purchaseSkill(player, club, skillSelect.value, defaultLeagueConfig);
+          showMessage(`${player.name}: ${skillSelect.value} gekauft (gebankt, noch nicht trainiert).`);
+          renderClub();
+        } catch (e) {
+          showMessage(e.message, true);
+        }
+      });
+      const skillCell = document.createElement('td');
+      skillCell.appendChild(skillSelect);
+      skillCell.appendChild(buySkillBtn);
+
+      tr.innerHTML = `
+        <td>${player.number}</td>
+        <td>${player.name}</td>
+        <td>${player.position}</td>
+        <td>${player.mr}</td>
+        <td>${player.attributes.bl.current}</td>
+        <td>${player.attributes.st.current}</td>
+        <td>${player.attributes.co.current}</td>
+        <td>${player.attributes.ag.current}</td>
+        <td>${player.attributes.pa.current}</td>
+        <td>${player.skills.join(', ') || '–'}</td>
+        <td>${player.bankedSkillPurchases.map((b) => b.skill).join(', ') || '–'}</td>
+        <td>${player.xp}
+          <button type="button" data-add-xp>+50 XP</button>
+        </td>
+        <td>${player.marketValue}</td>
+      `;
+      tr.querySelector('[data-add-xp]').addEventListener('click', () => {
+        player.xp += 50;
+        savePlayer(player);
+        renderClub();
+      });
+      tr.appendChild(skillCell);
+      body.appendChild(tr);
+    }
+  }
+
+  el('createClubBtn').addEventListener('click', () => {
+    const name = el('clubNameInput').value.trim();
+    if (!name) return;
+    club = createClub({ name });
+    saveClub(club);
+    renderClub();
+  });
+
+  el('signBtn').addEventListener('click', () => {
+    try {
+      const name = el('signName').value.trim();
+      if (!name) { showMessage('Name fehlt.', true); return; }
+      signPlayer({ club, position: el('signPosition').value, name });
+      el('signName').value = '';
+      showMessage(`${name} verpflichtet.`);
+      renderClub();
+    } catch (e) {
+      showMessage(e.message, true);
+    }
+  });
+
+  const existingClubIds = listClubIds();
+  if (existingClubIds.length > 0) {
+    club = loadClub(existingClubIds[0]);
+    renderClub();
+  }
+</script>
+</body>
+</html>
