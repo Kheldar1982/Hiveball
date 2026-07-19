@@ -1,8 +1,6 @@
 // Reine Formelfunktionen aus docs/hiveball_manager_spezifikation.md
-// Abschnitt 3 – bislang nur die für EP-für-Skills und Vereinskasse
-// benötigten Teile (Marktwert, Skill-Preis, Skill-Limit). Reps-Wachstum
-// (3.1/3.2), Aging-Verfall (3.5), Verletzungsschwere (3.6) etc. folgen erst
-// mit den jeweiligen späteren Phasen.
+// Abschnitt 3. Aging-Verfall (3.5, das eigentliche Würfeln), Verletzungs-
+// schwere (3.6) etc. folgen erst mit den jeweiligen späteren Phasen.
 
 import { POSITIONS_MANAGER_EXT } from './positions.js';
 
@@ -34,6 +32,31 @@ export function calculateMarketValue(player, config) {
   return base.price
     + extraAttributePoints * config.economy.marketValue.perExtraAttributePoint
     + extraSkills * config.economy.marketValue.perExtraSkill;
+}
+
+// Formel 3.1 (Reps-Schwelle): wie viele Reps für den n-ten Attributpunkt
+// über dem Positions-Grundwert nötig sind.
+export function repThreshold(n, config) {
+  return config.training.physical.repsFormula.base + config.training.physical.repsFormula.step * n;
+}
+
+// Alters-Modifikator auf gesammelte Reps (Formel 3.1). Bewusst gegenüber dem
+// wörtlichen Spezifikationstext umgedreht (1 / repsModifier statt
+// × repsModifier) – Nutzerentscheidung, da der Beschreibungstext "Talente
+// sammeln schneller Fortschritt" verspricht, die wörtliche Multiplikation mit
+// den konfigurierten Werten (talent 0.7, veteran 1.5) aber das Gegenteil
+// bewirkt hätte. careerEnd hat repsModifier: null → kein Fortschritt mehr.
+export function effectiveReps(rawReps, agePhase, config) {
+  const modifier = config.aging.phases[agePhase].repsModifier;
+  if (!modifier) return 0;
+  return rawReps / modifier;
+}
+
+// Formel 3.2 (Maximalwert): Positions-Grundwert + Level der physischen
+// Trainingsanlage. Gilt nur für die trainierbaren Attribute (bl/st/co/ag/pa)
+// – MR wächst nie über Reps (Grundprinzipien, Abschnitt 1).
+export function maxAttributeValue(attr, player, club, config) {
+  return POSITIONS_MANAGER_EXT[player.position][attr] + club.facilities.physicalTraining.level;
 }
 
 // Formel 3.3: Preis für den n-ten gekauften Zusatzskill (zählt nur gekaufte

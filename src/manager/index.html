@@ -41,6 +41,7 @@
         <th>#</th><th>Name</th><th>Position</th>
         <th>MR</th><th>BL</th><th>ST</th><th>CO</th><th>AG</th><th>PA</th>
         <th>Skills</th><th>Gebankt (ungetrainiert)</th><th>XP</th><th>Marktwert</th>
+        <th>Reps (bis nächste Schwelle)</th>
         <th>Skill kaufen</th>
       </tr>
     </thead>
@@ -52,6 +53,12 @@
   <input id="signName" placeholder="Name">
   <button id="signBtn">Kaufen</button>
 
+  <h3>Trainingswarteschlange (physisch)</h3>
+  <p class="hint">Spieler, die die Reps-Schwelle für einen Attributpunkt erreicht
+    haben. Das eigentliche Verbrauchen dieser Warteschlange (Trainings-Slots)
+    ist Phase 1c-Physisch, noch nicht Teil dieses Schritts.</p>
+  <ul id="trainingQueueList"></ul>
+
   <p id="message"></p>
 </div>
 
@@ -59,6 +66,8 @@
   import { createClub, loadClub, listClubIds, loadPlayers, saveClub, savePlayer } from './state.js';
   import { signPlayer } from './transferMarket.js';
   import { purchaseSkill } from './skills.js';
+  import { creditReps, nextStepFor, TRAINABLE_ATTRIBUTES } from './training.js';
+  import { repThreshold, maxAttributeValue } from './formulas.js';
   import { POSITIONS_MANAGER_EXT } from './positions.js';
   import { defaultLeagueConfig } from './leagueConfig.js';
 
@@ -94,6 +103,31 @@
 
     for (const player of roster) {
       const tr = document.createElement('tr');
+
+      const repsSummary = TRAINABLE_ATTRIBUTES.map((attr) => {
+        const max = maxAttributeValue(attr, player, club, defaultLeagueConfig);
+        if (player.attributes[attr].current >= max) return `${attr.toUpperCase()} MAX`;
+        const threshold = repThreshold(nextStepFor(player, attr), defaultLeagueConfig);
+        return `${attr.toUpperCase()} ${Math.floor(player.reps[attr])}/${threshold}`;
+      }).join(' · ');
+
+      const repsAttrSelect = document.createElement('select');
+      for (const attr of TRAINABLE_ATTRIBUTES) {
+        const opt = document.createElement('option');
+        opt.value = attr;
+        opt.textContent = attr.toUpperCase();
+        repsAttrSelect.appendChild(opt);
+      }
+      const addRepsBtn = document.createElement('button');
+      addRepsBtn.textContent = `+${defaultLeagueConfig.training.physical.maxRepsPerGamePerAttribute} Reps`;
+      addRepsBtn.addEventListener('click', () => {
+        creditReps(player, club, repsAttrSelect.value, defaultLeagueConfig.training.physical.maxRepsPerGamePerAttribute, defaultLeagueConfig);
+        renderClub();
+      });
+      const repsCell = document.createElement('td');
+      repsCell.appendChild(document.createTextNode(repsSummary + ' '));
+      repsCell.appendChild(repsAttrSelect);
+      repsCell.appendChild(addRepsBtn);
 
       const skillSelect = document.createElement('select');
       for (const skill of Object.keys(defaultLeagueConfig.xp.skillCosts)) {
@@ -139,8 +173,22 @@
         savePlayer(player);
         renderClub();
       });
+      tr.appendChild(repsCell);
       tr.appendChild(skillCell);
       body.appendChild(tr);
+    }
+
+    const queueList = el('trainingQueueList');
+    queueList.innerHTML = '';
+    if (club.trainingQueue.physical.length === 0) {
+      queueList.innerHTML = '<li>–</li>';
+    } else {
+      for (const entry of club.trainingQueue.physical) {
+        const p = roster.find((pl) => pl.playerId === entry.playerId);
+        const li = document.createElement('li');
+        li.textContent = `${p ? p.name : entry.playerId} – ${entry.attribute.toUpperCase()}`;
+        queueList.appendChild(li);
+      }
     }
   }
 
