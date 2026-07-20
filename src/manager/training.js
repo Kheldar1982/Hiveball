@@ -1,7 +1,7 @@
 // Rep-basiertes Attributwachstum (Phasenplan Phase 1b, Spezifikation 3.1/3.2)
 // plus das eigentliche physische Training (Phase 1c-Physisch): Verbrauchen
 // eines Warteschlangen-Eintrags gegen einen Trainings-Slot im
-// Trainingsgebäude (siehe training.html). Slot-Zuteilung/-Limits pro Spieler
+// Trainingscenter (siehe training.html). Slot-Zuteilung/-Limits pro Spieler
 // sind reine UI-Logik dort, hier nur die eigentliche Attributerhöhung.
 
 import { POSITIONS_MANAGER_EXT } from './positions.js';
@@ -44,7 +44,7 @@ export function creditReps(player, club, attr, rawReps, config = defaultLeagueCo
   return player;
 }
 
-// Verarbeitet einen einzelnen Warteschlangen-Eintrag (Trainingsgebäude,
+// Verarbeitet einen einzelnen Warteschlangen-Eintrag (Trainingscenter,
 // Phase 1c-Physisch): erhöht das Attribut um 1, reduziert die gesammelten
 // Reps um die dafür verbrauchte Schwelle (Überschuss bleibt erhalten, siehe
 // Spezifikation 2.1) und entfernt den Eintrag aus der Warteschlange.

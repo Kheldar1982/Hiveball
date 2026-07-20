@@ -392,7 +392,8 @@ hiveball/
 │   ├── hiveball.html                           ← Kernspiel-Prototyp (HTML/CSS/JS, keine Deps)
 │   └── manager/                                ← Manager-Teil, im Aufbau (siehe Spezifikation)
 │       ├── index.html                          ← minimale Kader-UI (Verein anlegen, Spieler/Skills kaufen)
-│       ├── training.html                       ← Trainingsgebäude-UI (physisches Training, Slot-Auswahl)
+│       ├── training.html                       ← Trainingscenter-UI (physisches Training, Slot-Auswahl)
+│       ├── academy.html                        ← Akademie-UI (Theorie-Training/Skills, Slot-Auswahl)
 │       ├── leagueConfig.js                     ← Default-Konfiguration der Liga
 │       ├── positions.js                        ← Positions-/Preistabelle inkl. Lineman
 │       ├── state.js                            ← Datenmodell (ManagerPlayer, Club) + Persistenz

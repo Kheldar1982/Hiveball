@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<title>Hiveball Manager – Trainingscenter</title>
+<title>Hiveball Manager – Akademie</title>
 <style>
   body { font-family: sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
   table { border-collapse: collapse; width: 100%; margin: 0.5rem 0 1.5rem; }
@@ -17,21 +17,21 @@
 </style>
 </head>
 <body>
-<h1>Hiveball Manager – Trainingscenter</h1>
-<p><a href="index.html">← Zurück zum Kader</a> · <a href="academy.html">Zur Akademie</a></p>
+<h1>Hiveball Manager – Akademie</h1>
+<p><a href="index.html">← Zurück zum Kader</a> · <a href="training.html">Zum Trainingscenter</a></p>
 <p class="hint">
-  Physisches Training (Phase 1c): pro Slot ein Spieler+Attribut aus der
-  Trainingswarteschlange auswählen, dann "Training durchführen" klicken.
-  Level 1–2: jeder Spieler kann nur in einem Slot stehen. Level 3: ein
-  zweiter Slot mit einem zweiten (anderen) Attribut ist für denselben
-  Spieler möglich.
+  Theorie-Training (Phase 1c-Theorie): pro Slot einen bereits bezahlten,
+  wartenden Skill auswählen, dann "Training durchführen" klicken. Pro Spieler
+  kann pro Sitzung nur ein Skill gelernt werden – unabhängig vom
+  Akademie-Level. Skills werden im Kader gekauft (EP), hier nur noch
+  freigeschaltet.
 </p>
 
 <div id="noClub" hidden><p>Kein Verein gefunden – zuerst auf der Kader-Seite einen Verein anlegen.</p></div>
 
 <div id="view" hidden>
   <h2 id="clubName"></h2>
-  <p>Physische Trainingsanlage: Level <span id="level"></span> (<span id="slotCount"></span> Slots)</p>
+  <p>Akademie: Level <span id="level"></span> (<span id="slotCount"></span> Slots)</p>
 
   <div id="slots"></div>
 
@@ -41,8 +41,7 @@
 
 <script type="module">
   import { loadClub, listClubIds, loadPlayers } from './state.js';
-  import { trainPhysicalAttribute, nextStepFor } from './training.js';
-  import { repThreshold, maxAttributeValue } from './formulas.js';
+  import { trainSkill } from './skills.js';
   import { defaultLeagueConfig } from './leagueConfig.js';
 
   const el = (id) => document.getElementById(id);
@@ -56,53 +55,44 @@
   let slots = [];
   let editingSlotIndex = null;
 
-  function maxSlotsPerPlayer() {
-    return club.facilities.physicalTraining.level >= 3 ? 2 : 1;
-  }
+  const MAX_SLOTS_PER_PLAYER = 1; // gilt auf allen Akademie-Leveln, laut Nutzervorgabe
 
   function countPlayerSlots(playerId, excludeIndex) {
     return slots.filter((s, i) => i !== excludeIndex && s && s.playerId === playerId).length;
   }
 
   function isRowSelectedElsewhere(entry, slotIndex) {
-    return slots.some((s, i) => i !== slotIndex && s && s.playerId === entry.playerId && s.attribute === entry.attribute);
-  }
-
-  function playerName(playerId) {
-    const p = roster.find((pl) => pl.playerId === playerId);
-    return p ? p.name : playerId;
+    return slots.some((s, i) => i !== slotIndex && s && s.playerId === entry.playerId && s.skill === entry.skill);
   }
 
   function renderSelectionTable(slotIndex) {
     const table = document.createElement('table');
-    table.innerHTML = '<thead><tr><th>Spieler</th><th>Position</th><th>Attribut</th><th>Reps</th><th></th></tr></thead>';
+    table.innerHTML = '<thead><tr><th>Spieler</th><th>Position</th><th>Skill</th><th></th></tr></thead>';
     const tbody = document.createElement('tbody');
 
-    for (const entry of club.trainingQueue.physical) {
+    for (const entry of club.trainingQueue.theory) {
       const player = roster.find((p) => p.playerId === entry.playerId);
       if (!player) continue;
 
       const tr = document.createElement('tr');
       const alreadyElsewhere = isRowSelectedElsewhere(entry, slotIndex);
-      const overLimit = countPlayerSlots(entry.playerId, slotIndex) >= maxSlotsPerPlayer();
+      const overLimit = countPlayerSlots(entry.playerId, slotIndex) >= MAX_SLOTS_PER_PLAYER;
       const blocked = alreadyElsewhere || overLimit;
 
-      const threshold = repThreshold(nextStepFor(player, entry.attribute), defaultLeagueConfig);
       const td = (text) => { const c = document.createElement('td'); c.textContent = text; return c; };
       tr.appendChild(td(player.name));
       tr.appendChild(td(player.position));
-      tr.appendChild(td(entry.attribute.toUpperCase()));
-      tr.appendChild(td(`${Math.floor(player.reps[entry.attribute])}/${threshold}`));
+      tr.appendChild(td(entry.skill));
 
       const actionTd = document.createElement('td');
       if (blocked) {
         tr.className = 'unavailable';
-        actionTd.textContent = alreadyElsewhere ? 'bereits in anderem Slot gewählt' : `Limit erreicht (Level ${club.facilities.physicalTraining.level})`;
+        actionTd.textContent = alreadyElsewhere ? 'bereits in anderem Slot gewählt' : 'nur 1 Skill pro Spieler und Sitzung';
       } else {
         const btn = document.createElement('button');
         btn.textContent = 'Wählen';
         btn.addEventListener('click', () => {
-          slots[slotIndex] = { playerId: entry.playerId, attribute: entry.attribute };
+          slots[slotIndex] = { playerId: entry.playerId, skill: entry.skill };
           editingSlotIndex = null;
           render();
         });
@@ -112,11 +102,11 @@
       tbody.appendChild(tr);
     }
 
-    if (club.trainingQueue.physical.length === 0) {
+    if (club.trainingQueue.theory.length === 0) {
       const tr = document.createElement('tr');
       const td = document.createElement('td');
-      td.colSpan = 5;
-      td.textContent = 'Keine Spieler in der Trainingswarteschlange.';
+      td.colSpan = 4;
+      td.textContent = 'Keine bezahlten Skills warten auf einen Slot.';
       tr.appendChild(td);
       tbody.appendChild(tr);
     }
@@ -127,8 +117,8 @@
 
   function render() {
     el('clubName').textContent = club.name;
-    el('level').textContent = club.facilities.physicalTraining.level;
-    const slotCount = defaultLeagueConfig.training.physical.levels[club.facilities.physicalTraining.level].slots;
+    el('level').textContent = club.facilities.theoryTraining.level;
+    const slotCount = defaultLeagueConfig.training.theory.levels[club.facilities.theoryTraining.level].slots;
     el('slotCount').textContent = slotCount;
 
     if (slots.length !== slotCount) {
@@ -145,7 +135,7 @@
 
       if (slot) {
         const player = roster.find((p) => p.playerId === slot.playerId);
-        box.appendChild(document.createTextNode(`Slot ${i + 1}: ${player ? player.name : slot.playerId} – ${slot.attribute.toUpperCase()}`));
+        box.appendChild(document.createTextNode(`Slot ${i + 1}: ${player ? player.name : slot.playerId} – ${slot.skill}`));
 
         const clearBtn = document.createElement('button');
         clearBtn.textContent = 'Leeren';
@@ -183,8 +173,8 @@
     try {
       for (const { s } of filled) {
         const player = roster.find((p) => p.playerId === s.playerId);
-        trainPhysicalAttribute(player, club, s.attribute, defaultLeagueConfig);
-        results.push(`${player.name}: ${s.attribute.toUpperCase()} → ${player.attributes[s.attribute].current}`);
+        trainSkill(player, club, s.skill, defaultLeagueConfig);
+        results.push(`${player.name}: ${s.skill}`);
       }
       showMessage(`Training abgeschlossen: ${results.join(', ')}`);
     } catch (e) {
