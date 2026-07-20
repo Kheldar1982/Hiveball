@@ -98,6 +98,32 @@ export function createClub({ name }) {
   };
 }
 
+// Standardaufstellung "Option A" (siehe README Kernspiel, Abschnitt 3):
+// 2 Blocker, 1 Werfer, 1 Fänger, 1 Läufer. Wird bei Vereinsgründung
+// automatisch angelegt. Kostenlos statt über den Transfermarkt gekauft –
+// zum Basispreis wären alle 5 zusammen (280.000) teurer als das gesamte
+// Startkapital (200.000), ein neuer Verein bringt seinen Gründungskader
+// also bereits mit, statt ihn sich erst leisten zu müssen.
+const STARTING_ROSTER = [
+  { position: 'Blocker', name: 'Blocker 1' },
+  { position: 'Blocker', name: 'Blocker 2' },
+  { position: 'Werfer', name: 'Werfer 1' },
+  { position: 'Fänger', name: 'Fänger 1' },
+  { position: 'Läufer', name: 'Läufer 1' }
+];
+
+export function createStartingRoster(club) {
+  const players = STARTING_ROSTER.map(({ position, name }, i) =>
+    createManagerPlayer({ position, name, clubId: club.clubId, number: i + 1 })
+  );
+  for (const player of players) {
+    club.roster.push(player.playerId);
+    savePlayer(player);
+  }
+  saveClub(club);
+  return players;
+}
+
 /* ============================================================
    PERSISTENZ (Spezifikation 9.1/9.2)
    ============================================================ */

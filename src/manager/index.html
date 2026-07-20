@@ -55,7 +55,7 @@
 </div>
 
 <script type="module">
-  import { createClub, loadClub, listClubIds, loadPlayers, saveClub, savePlayer } from './state.js';
+  import { createClub, createStartingRoster, loadClub, listClubIds, loadPlayers, savePlayer } from './state.js';
   import { signPlayer } from './transferMarket.js';
   import { purchaseSkill } from './skills.js';
   import { creditReps, nextStepFor, TRAINABLE_ATTRIBUTES } from './training.js';
@@ -191,7 +191,7 @@
     const name = el('clubNameInput').value.trim();
     if (!name) return;
     club = createClub({ name });
-    saveClub(club);
+    createStartingRoster(club);
     renderClub();
   });
 
