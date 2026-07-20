@@ -30,7 +30,7 @@
   <table id="rosterTable">
     <thead>
       <tr>
-        <th>#</th><th>Name</th><th>Position</th>
+        <th>#</th><th>Name</th><th>Position</th><th>Alter</th>
         <th>MR</th><th>BL</th><th>ST</th><th>CO</th><th>AG</th><th>PA</th>
         <th>Skills</th><th>Gebankt (ungetrainiert)</th><th>XP</th><th>Marktwert</th>
         <th>Reps (bis nächste Schwelle)</th>
@@ -59,7 +59,8 @@
   import { signPlayer } from './transferMarket.js';
   import { purchaseSkill } from './skills.js';
   import { creditReps, nextStepFor, TRAINABLE_ATTRIBUTES } from './training.js';
-  import { repThreshold, maxAttributeValue } from './formulas.js';
+  import { repThreshold, maxAttributeValue, agePhaseOf } from './formulas.js';
+  import { checkAgeCycleAndDecline } from './aging.js';
   import { POSITIONS_MANAGER_EXT } from './positions.js';
   import { defaultLeagueConfig } from './leagueConfig.js';
   import { renderHeader } from './layout.js';
@@ -99,6 +100,34 @@
 
     for (const player of roster) {
       const tr = document.createElement('tr');
+
+      const ageCell = document.createElement('td');
+      const phase = agePhaseOf(player.age, defaultLeagueConfig);
+      ageCell.appendChild(document.createTextNode(`${player.age} (${phase}, ${player.gamesPlayedTotal} Spiele) `));
+
+      const gamesInput = document.createElement('input');
+      gamesInput.type = 'number';
+      gamesInput.min = '1';
+      gamesInput.value = String(defaultLeagueConfig.aging.gamesPerAgeCycle);
+      gamesInput.style.width = '3.5em';
+      ageCell.appendChild(document.createElement('br'));
+      ageCell.appendChild(gamesInput);
+
+      const simulateBtn = document.createElement('button');
+      simulateBtn.textContent = 'Spiele simulieren';
+      simulateBtn.addEventListener('click', () => {
+        const count = Math.max(1, parseInt(gamesInput.value, 10) || 1);
+        const events = [];
+        for (let i = 0; i < count; i++) {
+          const result = checkAgeCycleAndDecline(player, club, defaultLeagueConfig);
+          if (result.agedUp) events.push(`Alter ${player.age}`);
+          if (result.declined) events.push(`Verfall ${result.attribute.toUpperCase()} -1`);
+          if (result.retired) { events.push('Zwangsrente!'); break; }
+        }
+        showMessage(`${player.name}: ${events.length ? events.join(', ') : `${count} Spiele ohne Alterssprung`}`);
+        renderClub();
+      });
+      ageCell.appendChild(simulateBtn);
 
       const repsSummary = TRAINABLE_ATTRIBUTES.map((attr) => {
         const max = maxAttributeValue(attr, player, club, defaultLeagueConfig);
@@ -189,6 +218,7 @@
         <td>${player.number}</td>
         <td class="name-cell"></td>
         <td>${player.position}</td>
+        <td class="age-cell"></td>
         <td>${player.mr}</td>
         <td>${player.attributes.bl.current}</td>
         <td>${player.attributes.st.current}</td>
@@ -203,6 +233,7 @@
         <td>${player.marketValue}</td>
       `;
       tr.querySelector('.name-cell').replaceWith(nameCell);
+      tr.querySelector('.age-cell').replaceWith(ageCell);
       tr.querySelector('[data-add-xp]').addEventListener('click', () => {
         player.xp += 50;
         savePlayer(player);

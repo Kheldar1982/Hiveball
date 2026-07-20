@@ -59,6 +59,28 @@ export function maxAttributeValue(attr, player, club, config) {
   return POSITIONS_MANAGER_EXT[player.position][attr] + club.facilities.physicalTraining.level;
 }
 
+// Formel 3.5: Alter aus gamesPlayedTotal (alle gamesPerAgeCycle Spiele +1 Jahr).
+export function ageFromGamesPlayed(gamesPlayedTotal, config) {
+  return config.aging.startAge + Math.floor(gamesPlayedTotal / config.aging.gamesPerAgeCycle);
+}
+
+// "Effektives" Alter für die Phasenbestimmung bei Verfallswürfen (nicht für
+// die Anzeige des tatsächlichen Alters): die medizinische Abteilung verzögert
+// den Eintritt in die nächste Phase um medicalPhaseDelayGames[medicalLevel]
+// zusätzliche Spiele.
+export function effectiveAgeForPhase(gamesPlayedTotal, medicalLevel, config) {
+  const delay = config.aging.medicalPhaseDelayGames[medicalLevel] || 0;
+  return ageFromGamesPlayed(Math.max(0, gamesPlayedTotal - delay), config);
+}
+
+// Verfallswahrscheinlichkeit der übergebenen Phase, reduziert durch die
+// medizinische Abteilung.
+export function declineChance(phase, medicalLevel, config) {
+  const base = config.aging.phases[phase].declineChance;
+  const reduction = config.aging.medicalDeclineReduction[medicalLevel] || 0;
+  return Math.max(0, base - reduction);
+}
+
 // Formel 3.3: Preis für den n-ten gekauften Zusatzskill (zählt nur gekaufte
 // Zusatzskills, nicht den positionseigenen Startskill).
 export function skillPrice(skill, additionalSkillNumber, config) {
