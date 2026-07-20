@@ -67,6 +67,7 @@
   renderHeader('kader');
 
   let club = null;
+  let editingNamePlayerId = null;
 
   const el = (id) => document.getElementById(id);
   const showMessage = (text, isError = false) => {
@@ -146,9 +147,47 @@
       skillCell.appendChild(skillSelect);
       skillCell.appendChild(buySkillBtn);
 
+      const nameCell = document.createElement('td');
+      if (editingNamePlayerId === player.playerId) {
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.value = player.name;
+        nameCell.appendChild(nameInput);
+        nameCell.appendChild(document.createElement('br'));
+
+        const saveNameBtn = document.createElement('button');
+        saveNameBtn.textContent = 'Speichern';
+        saveNameBtn.addEventListener('click', () => {
+          const newName = nameInput.value.trim();
+          if (!newName) { showMessage('Name darf nicht leer sein.', true); return; }
+          player.name = newName;
+          savePlayer(player);
+          editingNamePlayerId = null;
+          renderClub();
+        });
+        const cancelNameBtn = document.createElement('button');
+        cancelNameBtn.textContent = 'Abbrechen';
+        cancelNameBtn.addEventListener('click', () => {
+          editingNamePlayerId = null;
+          renderClub();
+        });
+        nameCell.appendChild(saveNameBtn);
+        nameCell.appendChild(cancelNameBtn);
+      } else {
+        nameCell.appendChild(document.createTextNode(player.name));
+        nameCell.appendChild(document.createElement('br'));
+        const renameBtn = document.createElement('button');
+        renameBtn.textContent = 'Ändern';
+        renameBtn.addEventListener('click', () => {
+          editingNamePlayerId = player.playerId;
+          renderClub();
+        });
+        nameCell.appendChild(renameBtn);
+      }
+
       tr.innerHTML = `
         <td>${player.number}</td>
-        <td>${player.name}</td>
+        <td class="name-cell"></td>
         <td>${player.position}</td>
         <td>${player.mr}</td>
         <td>${player.attributes.bl.current}</td>
@@ -163,6 +202,7 @@
         </td>
         <td>${player.marketValue}</td>
       `;
+      tr.querySelector('.name-cell').replaceWith(nameCell);
       tr.querySelector('[data-add-xp]').addEventListener('click', () => {
         player.xp += 50;
         savePlayer(player);
