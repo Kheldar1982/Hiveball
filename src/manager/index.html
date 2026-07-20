@@ -3,20 +3,11 @@
 <head>
 <meta charset="utf-8">
 <title>Hiveball Manager – Kader</title>
-<style>
-  body { font-family: sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
-  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
-  th, td { border: 1px solid #ccc; padding: 0.35rem 0.5rem; text-align: left; font-size: 0.85rem; }
-  th { background: #f0f0f0; }
-  .error { color: #b00020; }
-  .money { font-weight: bold; }
-  .hint { color: #666; font-size: 0.85rem; }
-  input, select, button { font-size: 0.9rem; padding: 0.2rem 0.4rem; }
-</style>
+<link rel="stylesheet" href="manager.css">
 </head>
 <body>
-<h1>Hiveball Manager – Kader</h1>
-<p><a href="training.html">Zum Trainingscenter</a> · <a href="academy.html">Zur Akademie</a></p>
+<div id="app-header"></div>
+<h1>Kader</h1>
 <p class="hint">
   Bewusst minimale Oberfläche für den aktuellen Phase-1-Stand (Datenmodell,
   Transfermarkt, EP-für-Skills). Kein Verkauf/Release, keine Vereinskasse-
@@ -71,6 +62,9 @@
   import { repThreshold, maxAttributeValue } from './formulas.js';
   import { POSITIONS_MANAGER_EXT } from './positions.js';
   import { defaultLeagueConfig } from './leagueConfig.js';
+  import { renderHeader } from './layout.js';
+
+  renderHeader('kader');
 
   let club = null;
 

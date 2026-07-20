@@ -3,22 +3,11 @@
 <head>
 <meta charset="utf-8">
 <title>Hiveball Manager – Trainingscenter</title>
-<style>
-  body { font-family: sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
-  table { border-collapse: collapse; width: 100%; margin: 0.5rem 0 1.5rem; }
-  th, td { border: 1px solid #ccc; padding: 0.35rem 0.5rem; text-align: left; font-size: 0.85rem; }
-  th { background: #f0f0f0; }
-  .hint { color: #666; font-size: 0.85rem; }
-  .error { color: #b00020; }
-  .slot { border: 1px solid #999; border-radius: 4px; padding: 0.6rem; margin: 0.5rem 0; }
-  .slot.empty { color: #666; }
-  button { font-size: 0.9rem; padding: 0.2rem 0.5rem; margin-left: 0.4rem; }
-  tr.unavailable { color: #aaa; }
-</style>
+<link rel="stylesheet" href="manager.css">
 </head>
 <body>
-<h1>Hiveball Manager – Trainingscenter</h1>
-<p><a href="index.html">← Zurück zum Kader</a> · <a href="academy.html">Zur Akademie</a></p>
+<div id="app-header"></div>
+<h1>Trainingscenter</h1>
 <p class="hint">
   Physisches Training (Phase 1c): pro Slot ein Spieler+Attribut aus der
   Trainingswarteschlange auswählen, dann "Training durchführen" klicken.
@@ -44,6 +33,9 @@
   import { trainPhysicalAttribute, nextStepFor } from './training.js';
   import { repThreshold, maxAttributeValue } from './formulas.js';
   import { defaultLeagueConfig } from './leagueConfig.js';
+  import { renderHeader } from './layout.js';
+
+  renderHeader('training');
 
   const el = (id) => document.getElementById(id);
   const showMessage = (text, isError = false) => {

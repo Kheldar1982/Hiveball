@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Hiveball Manager – Übersicht</title>
+<link rel="stylesheet" href="manager.css">
+</head>
+<body>
+<div id="app-header"></div>
+
+<div id="noClub" hidden><p>Kein Verein gefunden – zuerst auf der Kader-Seite einen Verein anlegen.</p></div>
+
+<div id="view" hidden>
+  <h2 id="clubName"></h2>
+
+  <div class="card-grid">
+    <div class="card"><h3>Kasse</h3><div class="value" id="money"></div></div>
+    <div class="card"><h3>Teamwert</h3><div class="value" id="teamValue"></div></div>
+    <div class="card"><h3>Kadergröße</h3><div class="value" id="rosterSize"></div></div>
+  </div>
+
+  <h3>Gebäude</h3>
+  <table>
+    <thead><tr><th>Gebäude</th><th>Level</th></tr></thead>
+    <tbody id="facilityBody"></tbody>
+  </table>
+</div>
+
+<script type="module">
+  import { loadClub, listClubIds, loadPlayers } from './state.js';
+  import { defaultLeagueConfig } from './leagueConfig.js';
+  import { renderHeader } from './layout.js';
+
+  renderHeader('overview');
+
+  const el = (id) => document.getElementById(id);
+
+  const FACILITY_LABELS = {
+    physicalTraining: 'Trainingscenter',
+    theoryTraining: 'Akademie',
+    medical: 'Medizinische Abteilung',
+    fanSector: 'Fan-Sektor',
+    fanshop: 'Fanshop',
+    catering: 'Catering',
+    stadium: 'Stadion',
+  };
+
+  const ids = listClubIds();
+  if (ids.length === 0) {
+    el('noClub').hidden = false;
+  } else {
+    const club = loadClub(ids[0]);
+    const roster = loadPlayers(club.roster);
+    const teamValue = roster.reduce((sum, p) => sum + p.marketValue, 0);
+
+    el('view').hidden = false;
+    el('clubName').textContent = club.name;
+    el('money').textContent = `${club.money} €`;
+    el('teamValue').textContent = `${teamValue} €`;
+    el('rosterSize').textContent = `${roster.length} / ${defaultLeagueConfig.roster.maxClubSize}`;
+
+    const facilityBody = el('facilityBody');
+    for (const key of Object.keys(FACILITY_LABELS)) {
+      const tr = document.createElement('tr');
+      const nameTd = document.createElement('td');
+      nameTd.textContent = FACILITY_LABELS[key];
+      const levelTd = document.createElement('td');
+      levelTd.textContent = club.facilities[key].level;
+      tr.appendChild(nameTd);
+      tr.appendChild(levelTd);
+      facilityBody.appendChild(tr);
+    }
+  }
+</script>
+</body>
+</html>

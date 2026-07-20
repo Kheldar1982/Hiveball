@@ -1,0 +1,117 @@
+/* Gemeinsames Stylesheet für den Manager-Teil (Anthrazit-Theme). */
+
+:root {
+  --bg: #1e2124;
+  --bg-alt: #2b2f33;
+  --border: #3a3f44;
+  --text: #e8e8e8;
+  --text-muted: #9a9a9a;
+  --accent: #e0a458;
+  --error: #ff6b6b;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: sans-serif;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 1rem 2rem;
+  background: var(--bg);
+  color: var(--text);
+}
+
+a { color: var(--accent); }
+
+h1, h2, h3 { color: var(--text); }
+
+/* Kopfzeile: Logo-Slot links, Navigation in derselben Zeile */
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 1.5rem;
+}
+
+.app-logo {
+  font-weight: bold;
+  font-size: 1.3rem;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.3rem 0.7rem;
+  background: var(--bg-alt);
+  white-space: nowrap;
+}
+
+.app-nav {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+}
+
+.app-nav a,
+.app-nav .nav-disabled {
+  text-decoration: none;
+  padding: 0.2rem 0;
+}
+
+.app-nav a { color: var(--text); }
+.app-nav a:hover { color: var(--accent); }
+
+.app-nav a.active {
+  font-weight: bold;
+  border-bottom: 2px solid var(--accent);
+}
+
+.app-nav .nav-disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+table { border-collapse: collapse; width: 100%; margin: 0.5rem 0 1.5rem; }
+th, td { border: 1px solid var(--border); padding: 0.35rem 0.5rem; text-align: left; font-size: 0.85rem; }
+th { background: var(--bg-alt); }
+
+.hint { color: var(--text-muted); font-size: 0.85rem; }
+.error { color: var(--error); }
+.money { font-weight: bold; }
+
+.slot { border: 1px solid var(--border); border-radius: 4px; padding: 0.6rem; margin: 0.5rem 0; background: var(--bg-alt); }
+.slot.empty { color: var(--text-muted); }
+
+button, input, select {
+  font-size: 0.9rem;
+  padding: 0.25rem 0.5rem;
+  margin-left: 0.4rem;
+  background: var(--bg-alt);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+button:hover { border-color: var(--accent); cursor: pointer; }
+
+tr.unavailable { color: var(--text-muted); }
+
+/* Übersicht: Kennzahlen-Kacheln */
+.card-grid { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0; }
+.card {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.8rem 1rem;
+  min-width: 160px;
+}
+.card h3 {
+  margin: 0 0 0.3rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.card .value { font-size: 1.4rem; font-weight: bold; }
