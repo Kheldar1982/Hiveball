@@ -18,24 +18,37 @@ aber **bewusst eigenständig entwickelt** (eigene Attributsnamen, W10 statt
 W6, eigene Mechaniken wie den Tackle-vs-Dodge-Zonenbonus und die
 distanzbasierte Passschwierigkeit), um urheberrechtlich unabhängig zu sein.
 
-Geplante Zwei-Teile-Architektur:
+Zwei-Teile-Architektur:
 
-- **Kernspiel** (aktueller Fokus): das eigentliche rundenbasierte Match, 5 gegen 5.
-- **Manager-Teil** (noch nicht begonnen): Kader-Verwaltung, Kauf/Verkauf,
-  Training, Stadion, Werbung, Liga-System.
+- **Kernspiel**: das eigentliche rundenbasierte Match, 5 gegen 5 (bzw. mehr
+  bei Bank-Wechseln, siehe unten).
+- **Manager-Teil** (im Aufbau, siehe `docs/hiveball_manager_spezifikation.md`
+  und `src/manager/`): Kader-Verwaltung, Kauf/Verkauf, Training, Aging,
+  Matchday-Nominierung. Persistiert über `localStorage`, geteilt mit dem
+  Kernspiel (siehe Abschnitt 2).
 
 ## 2. Aktueller Stand der Datei
 
-**Einzige Datei:** `src/hiveball.html` – ein vollständig eigenständiger
-Browser-Prototyp (HTML/CSS/Vanilla JS in einer Datei, keine Frameworks,
-keine Build-Schritte). Läuft rein clientseitig, **keine Persistenz, kein
-Backend, kein Multiplayer** – jedes Neuladen der Seite setzt das Spiel
-zurück.
+**Kernspiel:** `src/hiveball.html` – ein weiterhin weitgehend eigenständiger
+Browser-Prototyp (HTML/CSS/Vanilla JS, keine Frameworks, keine Build-Schritte).
+Läuft rein clientseitig, **kein Backend, kein Multiplayer**.
+
+Seit der Manager-Integration (Phase 1g) ist die Datei ein ES-Modul
+(`<script type="module">`) und lädt beim Start `src/manager/state.js`: Existiert
+ein Verein mit vollständiger Matchday-Nominierung (5 Feldspieler) in
+`localStorage`, spielt **Blau** mit dessen echten (trainierten/gealterten)
+Spielerwerten und Skills statt der festen Beispielaufstellung, inkl. Bank für
+Wechsel bei Verletzung/Platzverweis (gleiche Position → Lineman → beliebig
+verfügbar). **Rot** (KI) bleibt immer auf der festen Aufstellung "Option A"
+plus 2 Lineman auf der Bank – es gibt kein KI-Vereins-Datenmodell. Ohne
+Verein/ohne vollständige Nominierung bleibt das Kernspiel unverändert über die
+feste `TEAM_ROSTER` eigenständig spielbar (Fallback).
 
 Zwei Teams: **Blau** (menschlich gesteuert) gegen **Rot** (einfache KI).
 
 Einfach im Browser öffnen (`src/hiveball.html` doppelklicken oder per
 lokalem Server ausliefern) – kein `npm install`, kein Build-Schritt nötig.
+ES-Module funktionieren dabei auch direkt über `file://`.
 
 ## 3. Spielfeld & Teams
 
@@ -414,9 +427,11 @@ hiveball/
 
 ## Hinweis zur Weiterentwicklung
 
-Die Ein-Datei-Architektur (`src/hiveball.html`) ist eine bewusste
+Die Ein-Datei-Architektur (`src/hiveball.html`) war eine bewusste
 Design-Entscheidung für den Kernspiel-Prototyp (keine Build-Schritte, überall
-lauffähig). Diese Konvention sollte beibehalten werden, solange keine
-triftigen Gründe (z.B. der Manager-Teil mit eigenem Zustand/Persistenz)
-dagegen sprechen – dann ggf. gezielt in mehrere Dateien aufteilen und das
-hier dokumentieren.
+lauffähig) und ist mit der Manager-Integration (Phase 1g) an genau der
+vorgesehenen Stelle aufgeweicht worden: die Datei ist jetzt ein ES-Modul und
+importiert `src/manager/state.js`, um Blaus Aufstellung aus einem echten
+Verein zu laden. Weiterhin **kein Build-Schritt** (ES-Module laufen auch über
+`file://`), aber kein reines Einzeldatei-Prototyp mehr. Ohne Verein bleibt das
+Kernspiel über den TEAM_ROSTER-Fallback weiterhin eigenständig spielbar.

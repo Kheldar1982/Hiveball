@@ -636,6 +636,18 @@ ab Level 3).
 
 **Phase 1g** – Wechsel-Logik in `hiveball.html` (Abschnitt 7, Punkt 3).
 
+**Phase 1j** – Post-Match-Ergebnisobjekt (Abschnitt 7, Punkt 5) und
+Reps-Zählung während des Matches (Abschnitt 7, Punkt 6): kleine Zähler pro
+Spieler an den relevanten Stellen im Kernspiel (`checkScore`, `attemptPass`,
+`resolveBlock`, `attemptLeavingTackleZones`, `tryPickupBall`) für
+Touchdowns, Pässe, Fänge, Blocks, Dodges, Bomben, Lauf-Touchdowns,
+Underdog-Blocks sowie `repsGained` pro Attribut (gedeckelt auf
+`maxRepsPerGamePerAttribute`). Aus Abschnitt 7 herausgelöst und als eigene
+Phase nachgetragen, da sie im ursprünglichen Phasenplan keine eigene Nummer
+hatte, aber eine eigenständige, von der reinen Wechsel-Logik (1g) unabhängige
+Integrationsarbeit ist. Grundlage für `postMatch.js` (EP-Vergabe,
+Reps-Gutschrift, Verletzungsschwere, Alterszyklus, Abschnitt 4).
+
 **Phase 1h** – Verletzungsschwere-Wurf (Formel 3.6), Ausfallzähler,
 Nominierungssperre, Zwangsrente-Anbindung (Formel 3.8).
 

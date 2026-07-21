@@ -196,7 +196,13 @@
   </div>
 </div>
 
-<script>
+<script type="module">
+// Manager-Integration (Phase 1g): Blau wird, falls ein Verein mit
+// vollständiger Matchday-Nominierung existiert, daraus gespeist (siehe
+// loadBlueRosterFromManager/setupTeams). Ohne Verein/Nominierung bleibt das
+// Kernspiel unverändert eigenständig spielbar (feste TEAM_ROSTER-Fallback).
+import { listClubIds, loadClub, loadPlayers } from './manager/state.js';
+
 /* ============================================================
    KONSTANTEN & GRUNDAUFBAU
    ============================================================ */
@@ -212,6 +218,11 @@ const teams = [
 ];
 
 let players = [];
+// Spieler, die aktuell nicht auf dem Feld stehen (Bank). Einträge:
+// { team, position, managerPlayer } – managerPlayer ist null für Rot (KI).
+// Werden bei Verletzung/Platzverweis eines Feldspielers am nächsten Kickoff
+// eingewechselt (siehe substituteInjuredPlayers).
+let benchPlayers = [];
 let ball = { x: 0, y: 0, carrierId: null };
 let currentTeam = TEAM_BLUE;
 let selectedPlayerId = null;
@@ -316,8 +327,13 @@ function applyEquipment(player) {
   player.spMax = player.co * STAMINA_MULTIPLIER + mod.spMax;
 }
 
-// Team-Zusammensetzung "Option A": 2 Blocker, 1 Läufer, 1 Fänger, 1 Werfer
+// Team-Zusammensetzung "Option A": 2 Blocker, 1 Läufer, 1 Fänger, 1 Werfer.
+// Fallback für Blau (kein Verein/keine vollständige Nominierung) und feste
+// Startaufstellung für Rot (KI, kein Vereins-Datenmodell vorgesehen).
 const TEAM_ROSTER = ['Blocker', 'Blocker', 'Werfer', 'Fänger', 'Läufer'];
+
+// Feste Bank für Rot (KI), damit auch dort Wechsel-Logik greifen kann.
+const RED_BENCH_ROSTER = ['Lineman', 'Lineman'];
 
 // Aufstehen aus der Bodenlage kostet Bewegungspunkte (analog zu vielen Football-Regelwerken),
 // damit ein Umfallen auch dann eine spürbare Konsequenz hat, wenn es während des gegnerischen
@@ -384,8 +400,22 @@ const ZIELWERT_FOUL = 4;
 /* ============================================================
    SPIEL AUFSETZEN
    ============================================================ */
-function createPlayer(id, number, team, position, x, y) {
-  const stats = POSITIONS[position];
+// managerPlayer (optional): echter Kaderspieler aus dem Manager-Teil (siehe
+// loadBlueRosterFromManager). Ist er gesetzt, kommen Attribute/Skills aus
+// seinen aktuellen (trainierten/gealterten) Werten statt aus der reinen
+// Positions-Vorlage – genau das ist der Zweck der Manager-Integration.
+function createPlayer(id, number, team, position, x, y, managerPlayer = null) {
+  const stats = managerPlayer
+    ? {
+        mr: managerPlayer.mr,
+        bl: managerPlayer.attributes.bl.current,
+        st: managerPlayer.attributes.st.current,
+        co: managerPlayer.attributes.co.current,
+        ag: managerPlayer.attributes.ag.current,
+        pa: managerPlayer.attributes.pa.current,
+        skills: managerPlayer.skills
+      }
+    : POSITIONS[position];
   const player = {
     id,           // intern eindeutige ID (über beide Teams hinweg) – für Spiellogik
     number,       // Anzeige-Trikotnummer 1-5, innerhalb des eigenen Teams eindeutig
@@ -401,7 +431,13 @@ function createPlayer(id, number, team, position, x, y) {
     // gesetzt), erleidet dabei aber keinen SP-Schaden. Unterscheidung für spätere
     // Statistik/den Manager-Teil, spielmechanisch ohne eigene Bedeutung.
     sentOff: false,
-    acted: false
+    acted: false,
+    // Verknüpfung zur persistenten Manager-Spielerakte (null für Rot/Fallback-Blau).
+    // Grundlage für die spätere Post-Match-Auswertung (Phase 1j).
+    managerPlayerId: managerPlayer ? managerPlayer.playerId : null,
+    // Verhindert, dass beim nächsten Kickoff erneut nach einem Ersatz für
+    // diese (bereits ersetzte) Position gesucht wird.
+    substituted: false
   };
   applyEquipment(player);
   player.movesLeft = player.mr;
@@ -409,14 +445,78 @@ function createPlayer(id, number, team, position, x, y) {
   return player;
 }
 
+// Lädt Blaus Startaufstellung + Bank aus dem ersten gefundenen Verein
+// (localStorage, siehe src/manager/state.js). Liefert null, wenn kein Verein
+// existiert oder die Nominierung nicht genau 5 Feldspieler hat – dann bleibt
+// Blau beim festen TEAM_ROSTER-Fallback, damit das Kernspiel weiterhin
+// eigenständig spielbar ist.
+function loadBlueRosterFromManager() {
+  const clubIds = listClubIds();
+  if (clubIds.length === 0) return null;
+
+  const club = loadClub(clubIds[0]);
+  const roster = loadPlayers(club.roster);
+  const byId = (id) => roster.find(p => p.playerId === id);
+
+  const starters = club.lastMatchNomination.starters.map(byId).filter(Boolean);
+  if (starters.length !== 5) return null;
+
+  const bench = club.lastMatchNomination.bench.map(byId).filter(Boolean);
+  return { starters, bench };
+}
+
 function setupTeams() {
   players = [];
+  benchPlayers = [];
   let id = 0;
   const ys = [1, 2, 3, 4, 5];
-  // Team Blau links, greift nach rechts an
-  ys.forEach((y, i) => players.push(createPlayer(id++, i + 1, TEAM_BLUE, TEAM_ROSTER[i], 2, y)));
-  // Team Rot rechts, greift nach links an
+
+  // Team Blau links, greift nach rechts an – aus dem Manager-Kader, falls vorhanden.
+  const blueRoster = loadBlueRosterFromManager();
+  if (blueRoster) {
+    ys.forEach((y, i) => players.push(createPlayer(id++, i + 1, TEAM_BLUE, blueRoster.starters[i].position, 2, y, blueRoster.starters[i])));
+    blueRoster.bench.forEach(mp => benchPlayers.push({ team: TEAM_BLUE, position: mp.position, managerPlayer: mp }));
+  } else {
+    ys.forEach((y, i) => players.push(createPlayer(id++, i + 1, TEAM_BLUE, TEAM_ROSTER[i], 2, y)));
+  }
+
+  // Team Rot rechts, greift nach links an – fest, inkl. 2 Lineman auf der Bank.
   ys.forEach((y, i) => players.push(createPlayer(id++, i + 1, TEAM_RED, TEAM_ROSTER[i], COLS - 3, y)));
+  RED_BENCH_ROSTER.forEach(position => benchPlayers.push({ team: TEAM_RED, position, managerPlayer: null }));
+}
+
+// Ersetzt verwaiste Positionen (Spieler mit injured === true, inkl. Platzverweis)
+// durch einen Bankspieler, priorisiert nach: gleiche Position → Lineman →
+// beliebig verfügbar (Abschnitt 7, Punkt 3). Wird bei jedem Kickoff geprüft
+// (Spielbeginn + nach jedem Touchdown).
+function substituteInjuredPlayers() {
+  [TEAM_BLUE, TEAM_RED].forEach(team => {
+    players.filter(p => p.team === team && p.injured && !p.substituted).forEach(injuredPlayer => {
+      const replacement = pickBenchReplacement(team, injuredPlayer.position);
+      if (!replacement) return;
+
+      injuredPlayer.substituted = true;
+      benchPlayers = benchPlayers.filter(b => b !== replacement);
+
+      const newId = Math.max(0, ...players.map(p => p.id)) + 1;
+      const substitute = createPlayer(
+        newId, injuredPlayer.number, team, replacement.position,
+        injuredPlayer.startX, injuredPlayer.startY, replacement.managerPlayer
+      );
+      players.push(substitute);
+
+      const name = replacement.managerPlayer ? replacement.managerPlayer.name : replacement.position;
+      log(`🔄 ${teams[team].name} #${injuredPlayer.number} wird ersetzt: ${name} kommt von der Bank.`);
+    });
+  });
+}
+
+function pickBenchReplacement(team, injuredPosition) {
+  const candidates = benchPlayers.filter(b => b.team === team);
+  return candidates.find(b => b.position === injuredPosition)
+    || candidates.find(b => b.position === 'Lineman')
+    || candidates[0]
+    || null;
 }
 
 function resetBallToCenter() {
@@ -426,6 +526,7 @@ function resetBallToCenter() {
 }
 
 function startKickoff() {
+  substituteInjuredPlayers();
   players.forEach(p => {
     p.x = p.startX; p.y = p.startY;
     p.prone = false; p.acted = false;
@@ -929,7 +1030,7 @@ function attemptLeavingTackleZones(dodger, destX, destY) {
       if (selfFall.injured) {
         tackler.injured = true;
         setStatus(`Spieler ${tackler.number} stürzt beim verpatzten Tackle und verletzt sich!`);
-        log(`🚑 Spieler ${tackler.number} (${teams[tackler.team].name}) ist verletzt und verlässt das Feld.`);
+        log(`🚑 Spieler ${tackler.number} (${teams[tackler.team].name}) scheidet aus.`);
       }
     }
 
@@ -947,7 +1048,7 @@ function attemptLeavingTackleZones(dodger, destX, destY) {
       if (inj.injured) {
         dodger.injured = true;
         setStatus(`Spieler ${dodger.number} wird beim Tackle verletzt!`);
-        log(`🚑 Spieler ${dodger.number} (${teams[dodger.team].name}) ist verletzt und verlässt das Feld.`);
+        log(`🚑 Spieler ${dodger.number} (${teams[dodger.team].name}) scheidet aus.`);
       } else {
         setStatus(`Spieler ${dodger.number} wird beim Tackle umgehauen!`);
       }
@@ -1252,7 +1353,7 @@ function resolveBlock(attacker, defender) {
   if (injuryResult.injured) {
     loser.injured = true;
     setStatus(`Spieler ${loser.number} ist verletzt und scheidet aus!`);
-    log(`🚑 Spieler ${loser.number} (${teams[loser.team].name}) ist verletzt und verlässt das Feld.`);
+    log(`🚑 Spieler ${loser.number} (${teams[loser.team].name}) scheidet aus.`);
   } else {
     setStatus(`Spieler ${loser.number} liegt am Boden, steht aber nächste Runde wieder auf.`);
   }
@@ -1314,7 +1415,7 @@ function resolveFoul(attacker, victim) {
   if (injuryResult.injured) {
     victim.injured = true;
     setStatus(`Spieler ${victim.number} wird beim Foul verletzt und scheidet aus!`);
-    log(`🚑 Spieler ${victim.number} (${teams[victim.team].name}) ist verletzt und verlässt das Feld.`);
+    log(`🚑 Spieler ${victim.number} (${teams[victim.team].name}) scheidet aus.`);
   } else {
     setStatus(`Spieler ${victim.number} übersteht das Foul.`);
   }
