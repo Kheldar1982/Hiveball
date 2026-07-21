@@ -405,7 +405,8 @@ hiveball/
 │       ├── economy.js                          ← Vereinskasse (Gehälter, Siegprämie)
 │       ├── skills.js                           ← EP-für-Skills (Skill-Kauf gegen XP)
 │       ├── training.js                         ← Reps-Sammlung + physisches Training (Warteschlange verbrauchen)
-│       └── aging.js                            ← Aging-System (Formel 3.5) + Zwangsrente (Formel 3.8)
+│       ├── aging.js                            ← Aging-System (Formel 3.5) + Zwangsrente (Formel 3.8)
+│       └── nomination.js                       ← Matchday-Status je Spieler (Feld/Bank/Frei), direkt im Kader
 └── docs/
     ├── Hiveball_Manager_Regelwerk_v0_12.pdf     ← ursprüngliches Design-/Regeldokument
     └── hiveball_manager_spezifikation.md        ← technische Spezifikation Manager-Teil

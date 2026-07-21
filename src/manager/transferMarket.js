@@ -7,8 +7,6 @@ import { POSITIONS_MANAGER_EXT } from './positions.js';
 import { defaultLeagueConfig } from './leagueConfig.js';
 import { createManagerPlayer, saveClub, savePlayer, loadPlayers } from './state.js';
 
-const SPECIALIST_POSITIONS = ['Blocker', 'Werfer', 'Fänger', 'Läufer'];
-
 function nextAvailableNumber(existingNumbers, maxClubSize) {
   for (let n = 1; n <= maxClubSize; n++) {
     if (!existingNumbers.includes(n)) return n;
@@ -17,8 +15,11 @@ function nextAvailableNumber(existingNumbers, maxClubSize) {
 }
 
 // Kauft einen neuen Spieler der angegebenen Position für den Club: prüft
-// Vereinskasse und Formations-Obergrenzen (leagueConfig.roster), vergibt die
+// Vereinskasse und Kadergröße (leagueConfig.roster.maxClubSize), vergibt die
 // nächste freie Trikotnummer, zieht den Preis ab und persistiert Club+Spieler.
+// Keine Ownership-Obergrenze je Spezialposition mehr – die greift erst bei
+// der Matchday-Nominierung (max. gleichzeitig "Feld", siehe nomination.js),
+// ein Verein darf also z.B. mehr als 2 Blocker besitzen.
 export function signPlayer({ club, position, name, config = defaultLeagueConfig }) {
   const base = POSITIONS_MANAGER_EXT[position];
   if (!base) throw new Error(`Unbekannte Position: ${position}`);
@@ -32,14 +33,6 @@ export function signPlayer({ club, position, name, config = defaultLeagueConfig 
   }
 
   const teammates = loadPlayers(club.roster);
-
-  if (SPECIALIST_POSITIONS.includes(position)) {
-    const countAtPosition = teammates.filter((p) => p.position === position).length;
-    if (countAtPosition >= rosterConfig.maxPerSpecialistPosition) {
-      throw new Error(`Positions-Obergrenze erreicht: max. ${rosterConfig.maxPerSpecialistPosition}x ${position}`);
-    }
-  }
-
   const number = nextAvailableNumber(teammates.map((p) => p.number), rosterConfig.maxClubSize);
   const player = createManagerPlayer({ position, name, clubId: club.clubId, number });
 

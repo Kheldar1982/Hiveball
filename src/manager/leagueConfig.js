@@ -108,10 +108,15 @@ export const defaultLeagueConfig = {
   },
 
   roster: {
-    maxClubSize: 10,
+    maxClubSize: 12,
     maxMatchdayNomination: 8,
     startingLineupSize: 5,
     maxBench: 3,
-    maxPerSpecialistPosition: 2 // gilt für Blocker/Werfer/Fänger/Läufer, nicht Lineman
+    // Gilt für Blocker/Werfer/Fänger/Läufer (nicht Lineman), aber nur für
+    // gleichzeitigen "Feld"-Status in der Matchday-Nominierung – keine
+    // Ownership-Obergrenze. Ein Verein darf z.B. 3 Blocker besitzen, es
+    // dürfen nur nie mehr als 2 davon gleichzeitig auf "Feld" stehen
+    // (gilt später auch für Auswechslungen bei Verletzten).
+    maxPerSpecialistPosition: 2
   }
 };
