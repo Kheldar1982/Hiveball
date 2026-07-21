@@ -3,6 +3,13 @@
 // laut Abschnitt 1 der Spezifikation grundsätzlich änderbar (spätere
 // Liga-Settings-UI, Phase 1e); Min/Max-Leitplanken je Feld sind noch offen.
 
+// W<n>-Wurf für die severityTable-Einträge unten (Formel 3.6: "W3+2"/"W4+5").
+// Rein lokal, da die Tabelle selbst in dieser Datei lebt und dieser Helfer
+// nirgends sonst gebraucht wird.
+function roll(sides) {
+  return 1 + Math.floor(Math.random() * sides);
+}
+
 export const defaultLeagueConfig = {
   training: {
     physical: {

@@ -1,40 +1,52 @@
 // Aging-System (Phasenplan Phase 1d, Spezifikation 3.5) plus Zwangsrente
-// (Formel 3.8, eigentlich Phase 1h): die einzige aktuell erreichbare
-// Auslösebedingung für Zwangsrente ("Alter >= forcedRetirementAge oder ein
-// physisches Attribut <= 1") folgt direkt aus dem Aging-Verfall, daher schon
-// hier mit eingebaut. Die übrigen Phase-1h-Punkte (Verletzungsschwere-Wurf
-// 3.6, Ausfallzähler, Nominierungssperre) hängen an Matchergebnissen bzw.
-// der Matchday-Nominierung (Phase 1f/1g) und sind nicht Teil dieses Moduls;
-// die 8%-Sonderchance auf Zwangsrente bei "Schwerste Verletzung" bleibt
-// entsprechend unerreichbar, bis Formel 3.6 existiert.
+// (Formel 3.8). Die Attribut-Verfall-/Zwangsrente-Hilfsfunktionen sind
+// exportiert, damit injury.js (Phase 1h) sie für die verletzungsbedingten
+// Auslöser (Attribut fällt auf <= 1, 8%-Sonderchance bei "Schwerste
+// Verletzung") wiederverwenden kann, statt sie zu duplizieren.
 
 import { defaultLeagueConfig } from './leagueConfig.js';
 import { agePhaseOf, ageFromGamesPlayed, effectiveAgeForPhase, declineChance } from './formulas.js';
 import { savePlayer, saveClub } from './state.js';
 
-// Nur diese drei verfallen durchs Aging (Grundprinzipien, Abschnitt 1).
-const DECLINABLE_ATTRIBUTES = ['mr', 'ag', 'st'];
+// Nur diese drei verfallen durchs Aging bzw. durch Verletzungen (Grundprinzipien, Abschnitt 1).
+export const DECLINABLE_ATTRIBUTES = ['mr', 'ag', 'st'];
 
-function getAttr(player, attr) {
+export function getAttr(player, attr) {
   return attr === 'mr' ? player.mr : player.attributes[attr].current;
 }
 
-function setAttr(player, attr, value) {
+export function setAttr(player, attr, value) {
   if (attr === 'mr') player.mr = value;
   else player.attributes[attr].current = value;
 }
 
-// Formel 3.8: Zwangsrente bei Alter >= forcedRetirementAge oder einem
-// physischen Attribut <= 1. Entfernt den Spieler aus Kader und Nominierung.
-function checkForcedRetirement(player, club, config) {
-  const atMinimum = DECLINABLE_ATTRIBUTES.some((attr) => getAttr(player, attr) <= 1);
-  if (player.age < config.aging.forcedRetirementAge && !atMinimum) return false;
+// Senkt ein zufällig gewähltes physisches Attribut um 1 (Minimum 1). Wird
+// sowohl vom Aging-Verfall (unten) als auch vom verletzungsbedingten
+// Attributverlust (injury.js, Formel 3.6) genutzt.
+export function declineRandomAttribute(player) {
+  const attr = DECLINABLE_ATTRIBUTES[Math.floor(Math.random() * DECLINABLE_ATTRIBUTES.length)];
+  setAttr(player, attr, Math.max(1, getAttr(player, attr) - 1));
+  return attr;
+}
 
+// Setzt einen Spieler in den Ruhestand: retired/status, entfernt ihn aus
+// Kader und aktueller Nominierung (Formel 3.8, letzter Schritt).
+export function retirePlayer(player, club) {
   player.retired = true;
   player.status = 'im_ruhestand';
   club.roster = club.roster.filter((id) => id !== player.playerId);
   club.lastMatchNomination.starters = club.lastMatchNomination.starters.filter((id) => id !== player.playerId);
   club.lastMatchNomination.bench = club.lastMatchNomination.bench.filter((id) => id !== player.playerId);
+}
+
+// Formel 3.8: Zwangsrente bei Alter >= forcedRetirementAge oder einem
+// physischen Attribut <= 1. Gibt zurück, ob der Spieler dadurch in den
+// Ruhestand gegangen ist.
+export function checkForcedRetirement(player, club, config) {
+  const atMinimum = DECLINABLE_ATTRIBUTES.some((attr) => getAttr(player, attr) <= 1);
+  if (player.age < config.aging.forcedRetirementAge && !atMinimum) return false;
+
+  retirePlayer(player, club);
   return true;
 }
 
@@ -57,10 +69,8 @@ export function checkAgeCycleAndDecline(player, club, config = defaultLeagueConf
     const chance = declineChance(phase, medicalLevel, config);
 
     if (Math.random() < chance) {
-      const attr = DECLINABLE_ATTRIBUTES[Math.floor(Math.random() * DECLINABLE_ATTRIBUTES.length)];
-      setAttr(player, attr, Math.max(1, getAttr(player, attr) - 1));
+      result.attribute = declineRandomAttribute(player);
       result.declined = true;
-      result.attribute = attr;
     }
 
     result.retired = checkForcedRetirement(player, club, config);

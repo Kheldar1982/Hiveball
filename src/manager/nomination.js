@@ -29,7 +29,12 @@ function countFeldForPosition(club, position, excludePlayerId) {
 
 // Prüft, ob ein Spieler in den gewünschten Status wechseln dürfte (ohne ihn
 // zu setzen) – Grundlage dafür, welche Optionen die Kombobox überhaupt zeigt.
+// Nominierungssperre (Phase 1h): ein verletzter Spieler (injury.gamesRemaining
+// > 0) kann nur "frei" sein, nie "feld"/"bank" – unabhängig von der UI, die
+// für diesen Fall ohnehin nur "Verletzt" statt der Kombobox anzeigt.
 export function canSetMatchdayStatus(player, club, status, config = defaultLeagueConfig) {
+  if (player.injury.gamesRemaining > 0) return status === 'frei';
+
   if (status === getPlayerMatchdayStatus(player, club)) return true;
 
   if (status === 'frei') return true;

@@ -44,6 +44,14 @@ plus 2 Lineman auf der Bank – es gibt kein KI-Vereins-Datenmodell. Ohne
 Verein/ohne vollständige Nominierung bleibt das Kernspiel unverändert über die
 feste `TEAM_ROSTER` eigenständig spielbar (Fallback).
 
+Seit Phase 1h meldet `endGame()` außerdem für jeden Blau-Spieler mit
+Kaderanbindung SP-Endstand + Ausscheiden-Flag an `src/manager/injury.js`:
+ausgeschiedene Spieler erhalten einen gewürfelten Verletzungsschwere-Grad
+(Formel 3.6, inkl. möglichem Attributverlust/Zwangsrente) und werden aus der
+Nominierung entfernt; der gesamte Kader heilt passiv 1 Spiel Ausfallzeit pro
+gespieltem Match (Formel 3.7, ohne die medizinisch beschleunigte Reduktion –
+die kommt erst mit der medizinischen Abteilung, Phase 1i).
+
 Zwei Teams: **Blau** (menschlich gesteuert) gegen **Rot** (einfache KI).
 
 Einfach im Browser öffnen (`src/hiveball.html` doppelklicken oder per
@@ -419,7 +427,8 @@ hiveball/
 │       ├── skills.js                           ← EP-für-Skills (Skill-Kauf gegen XP)
 │       ├── training.js                         ← Reps-Sammlung + physisches Training (Warteschlange verbrauchen)
 │       ├── aging.js                            ← Aging-System (Formel 3.5) + Zwangsrente (Formel 3.8)
-│       └── nomination.js                       ← Matchday-Status je Spieler (Feld/Bank/Frei), direkt im Kader
+│       ├── nomination.js                       ← Matchday-Status je Spieler (Feld/Bank/Frei), direkt im Kader
+│       └── injury.js                           ← Verletzungsschwere (Formel 3.6) + Ausfallzähler-Heilung
 └── docs/
     ├── Hiveball_Manager_Regelwerk_v0_12.pdf     ← ursprüngliches Design-/Regeldokument
     └── hiveball_manager_spezifikation.md        ← technische Spezifikation Manager-Teil

@@ -201,7 +201,10 @@
 // vollständiger Matchday-Nominierung existiert, daraus gespeist (siehe
 // loadBlueRosterFromManager/setupTeams). Ohne Verein/Nominierung bleibt das
 // Kernspiel unverändert eigenständig spielbar (feste TEAM_ROSTER-Fallback).
+// Phase 1h: am Matchende werden SP-Endstand/Ausscheiden für Blau gemeldet
+// (siehe processManagerPostMatch/endGame) – Verletzungsschwere + Ausfallzähler.
 import { listClubIds, loadClub, loadPlayers } from './manager/state.js';
+import { processMatchEndForClub } from './manager/injury.js';
 
 /* ============================================================
    KONSTANTEN & GRUNDAUFBAU
@@ -991,7 +994,28 @@ function endGame(message) {
   document.getElementById('btn-foul').disabled = true;
   document.getElementById('btn-pass').disabled = true;
   document.getElementById('btn-endturn').disabled = true;
+  processManagerPostMatch();
   draw();
+}
+
+// Manager-Integration (Phase 1h): meldet für jeden Blau-Spieler mit echter
+// Kadereinbindung SP-Endstand + Ausscheiden-Flag an die Verletzungsschwere-/
+// Ausfallzähler-Verarbeitung (injury.js). Ohne Verein/Manager-Kader (reiner
+// TEAM_ROSTER-Fallback) passiert nichts.
+function processManagerPostMatch() {
+  const managerBluePlayers = players.filter(p => p.team === TEAM_BLUE && p.managerPlayerId);
+  if (managerBluePlayers.length === 0) return;
+
+  const clubIds = listClubIds();
+  if (clubIds.length === 0) return;
+  const club = loadClub(clubIds[0]);
+
+  const matchResults = managerBluePlayers.map(p => ({
+    managerPlayerId: p.managerPlayerId,
+    finalSp: p.sp,
+    wasInjured: p.injured
+  }));
+  processMatchEndForClub(club, matchResults);
 }
 
 // Wird aufgerufen, bevor ein Dodger (sich bewegender Spieler) sein Feld verlässt.

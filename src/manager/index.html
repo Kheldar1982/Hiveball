@@ -180,7 +180,7 @@
 
       const matchdayCell = document.createElement('td');
       if (player.injury.gamesRemaining > 0) {
-        matchdayCell.textContent = 'Verletzt';
+        matchdayCell.textContent = `Verletzt (${player.injury.severity}, noch ${player.injury.gamesRemaining} Spiele)`;
         matchdayCell.style.color = 'var(--text-muted)';
       } else {
         const statusLabels = { feld: 'Feld', bank: 'Bank', frei: 'Frei' };
