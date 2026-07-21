@@ -440,7 +440,11 @@ function createPlayer(id, number, team, position, x, y, managerPlayer = null) {
     managerPlayerId: managerPlayer ? managerPlayer.playerId : null,
     // Verhindert, dass beim nächsten Kickoff erneut nach einem Ersatz für
     // diese (bereits ersetzte) Position gesucht wird.
-    substituted: false
+    substituted: false,
+    // Match-lokale Zähler für die Hall of Fame (Karriere-Statistik, siehe
+    // processManagerPostMatch/injury.js) – kein Teil der Spezifikation.
+    matchTouchdowns: 0,
+    matchInjuriesCaused: 0
   };
   applyEquipment(player);
   player.movesLeft = player.mr;
@@ -970,6 +974,7 @@ function checkScore(player) {
   if (ball.carrierId !== player.id) return false;
   if (player.x === teams[player.team].endzoneCol) {
     teams[player.team].score++;
+    player.matchTouchdowns++;
     log(`🏈 TOUCHDOWN für ${teams[player.team].name}!`);
     updateScoreboard();
     regenerateStaminaAfterTouchdown();
@@ -998,10 +1003,12 @@ function endGame(message) {
   draw();
 }
 
-// Manager-Integration (Phase 1h): meldet für jeden Blau-Spieler mit echter
-// Kadereinbindung SP-Endstand + Ausscheiden-Flag an die Verletzungsschwere-/
-// Ausfallzähler-Verarbeitung (injury.js). Ohne Verein/Manager-Kader (reiner
-// TEAM_ROSTER-Fallback) passiert nichts.
+// Manager-Integration (Phase 1h + Hall of Fame): meldet für jeden Blau-Spieler
+// mit echter Kadereinbindung SP-Endstand, Ausscheiden-Flag sowie Touchdowns/
+// verursachte Verletzungen aus diesem Match an injury.js – dort werden daraus
+// Verletzungsschwere, Ausfallzähler-Heilung, Alterszyklus (gamesPlayedTotal)
+// und die Karriere-Statistik für die Hall of Fame verarbeitet. Ohne Verein/
+// Manager-Kader (reiner TEAM_ROSTER-Fallback) passiert nichts.
 function processManagerPostMatch() {
   const managerBluePlayers = players.filter(p => p.team === TEAM_BLUE && p.managerPlayerId);
   if (managerBluePlayers.length === 0) return;
@@ -1013,7 +1020,9 @@ function processManagerPostMatch() {
   const matchResults = managerBluePlayers.map(p => ({
     managerPlayerId: p.managerPlayerId,
     finalSp: p.sp,
-    wasInjured: p.injured
+    wasInjured: p.injured,
+    touchdowns: p.matchTouchdowns,
+    injuriesCaused: p.matchInjuriesCaused
   }));
   processMatchEndForClub(club, matchResults);
 }
@@ -1071,6 +1080,7 @@ function attemptLeavingTackleZones(dodger, destX, destY) {
       log(`Verletzungscheck – ${teams[tackler.team].name} #${tackler.number}: ${inj.desc}`);
       if (inj.injured) {
         dodger.injured = true;
+        tackler.matchInjuriesCaused++;
         setStatus(`Spieler ${dodger.number} wird beim Tackle verletzt!`);
         log(`🚑 Spieler ${dodger.number} (${teams[dodger.team].name}) scheidet aus.`);
       } else {
@@ -1376,6 +1386,7 @@ function resolveBlock(attacker, defender) {
 
   if (injuryResult.injured) {
     loser.injured = true;
+    winner.matchInjuriesCaused++;
     setStatus(`Spieler ${loser.number} ist verletzt und scheidet aus!`);
     log(`🚑 Spieler ${loser.number} (${teams[loser.team].name}) scheidet aus.`);
   } else {
@@ -1438,6 +1449,7 @@ function resolveFoul(attacker, victim) {
 
   if (injuryResult.injured) {
     victim.injured = true;
+    attacker.matchInjuriesCaused++;
     setStatus(`Spieler ${victim.number} wird beim Foul verletzt und scheidet aus!`);
     log(`🚑 Spieler ${victim.number} (${teams[victim.team].name}) scheidet aus.`);
   } else {

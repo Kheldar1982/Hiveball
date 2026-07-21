@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { key: 'kader', label: 'Kader', href: 'index.html' },
   { key: 'training', label: 'Trainingscenter', href: 'training.html' },
   { key: 'academy', label: 'Akademie', href: 'academy.html' },
+  { key: 'hall-of-fame', label: 'Hall of Fame', href: 'hall-of-fame.html' },
   { key: 'medical', label: 'Medizinische Abteilung', href: null },
   { key: 'fanSector', label: 'Fan-Sektor', href: null },
   { key: 'fanshop', label: 'Fanshop', href: null },

@@ -50,7 +50,16 @@ ausgeschiedene Spieler erhalten einen gewürfelten Verletzungsschwere-Grad
 (Formel 3.6, inkl. möglichem Attributverlust/Zwangsrente) und werden aus der
 Nominierung entfernt; der gesamte Kader heilt passiv 1 Spiel Ausfallzeit pro
 gespieltem Match (Formel 3.7, ohne die medizinisch beschleunigte Reduktion –
-die kommt erst mit der medizinischen Abteilung, Phase 1i).
+die kommt erst mit der medizinischen Abteilung, Phase 1i). Echte Matches
+zählen dabei genauso als gespieltes Spiel wie der Debug-Button "Spiele
+simulieren" (dasselbe `checkAgeCycleAndDecline`) – Alterszyklus/-verfall und
+Alters-Zwangsrente können also jetzt auch aus echten Matches folgen. Zwei
+Karriere-Zähler (Touchdowns, verursachte Verletzungen – kein Teil der
+Spezifikation, für die Hall of Fame ergänzt) werden dafür pro Spieler direkt
+im Kernspiel mitgezählt (`checkScore`, `resolveBlock`,
+`attemptLeavingTackleZones`, `resolveFoul`). Scheidet ein Spieler per
+Zwangsrente aus, bleibt sein Datensatz erhalten und erscheint auf der
+"Hall of Fame"-Seite mit Statistik + Ausscheidegrund.
 
 Zwei Teams: **Blau** (menschlich gesteuert) gegen **Rot** (einfache KI).
 
@@ -416,6 +425,7 @@ hiveball/
 │       ├── index.html                          ← minimale Kader-UI (Verein anlegen, Spieler/Skills kaufen)
 │       ├── training.html                       ← Trainingscenter-UI (physisches Training, Slot-Auswahl)
 │       ├── academy.html                        ← Akademie-UI (Theorie-Training/Skills, Slot-Auswahl)
+│       ├── hall-of-fame.html                   ← ausgeschiedene Spieler mit Statistik/Ausscheidegrund
 │       ├── layout.js                           ← gemeinsame Kopfzeile (Logo-Slot + Navigation) aller Seiten
 │       ├── manager.css                         ← gemeinsames Stylesheet (Anthrazit-Theme)
 │       ├── leagueConfig.js                     ← Default-Konfiguration der Liga

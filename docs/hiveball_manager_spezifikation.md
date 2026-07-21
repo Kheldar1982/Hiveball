@@ -91,7 +91,19 @@ aus der zu Matchbeginn die Kernspiel-Spielerobjekte erzeugt werden.
 
   marketValue: 30000,            // Basis + Aufschläge (Formel siehe Phase 3, Platzhalter in Phase 1)
   retired: false,
-  status: "aktiv" | "verletzt" | "im_ruhestand"
+  status: "aktiv" | "verletzt" | "im_ruhestand",
+
+  // Nicht Teil der ursprünglichen Spezifikation, nachträglich für die
+  // "Hall of Fame"-Seite ergänzt (ausgeschiedene Spieler, siehe Abschnitt 8
+  // Architektur-Empfehlung/Implementierungsstand):
+  careerTouchdowns: 0,           // im Kernspiel mitgezählt (checkScore)
+  careerInjuriesCaused: 0,       // im Kernspiel mitgezählt (resolveBlock,
+                                  // attemptLeavingTackleZones, resolveFoul)
+  retirement: null                // null solange aktiv, sonst:
+                                  // { reason: "Alter" | "Attribut-Minimum" |
+                                  //   "Alter & Attribut-Minimum" |
+                                  //   "Schwerste Verletzung",
+                                  //   gamesPlayedTotal, retiredAt }
 }
 ```
 

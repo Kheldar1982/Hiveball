@@ -55,6 +55,17 @@ export function createManagerPlayer({ position, name, clubId, number, age = defa
       severity: null
     },
 
+    // Karriere-Statistik über alle Matches hinweg (nicht Teil der
+    // Spezifikation, für die Hall of Fame ergänzt). Wird am Matchende aus den
+    // Kernspiel-Zählern übernommen, siehe src/manager/injury.js.
+    careerTouchdowns: 0,
+    careerInjuriesCaused: 0,
+
+    // null solange aktiv; beim Ausscheiden (Zwangsrente, siehe aging.js/
+    // injury.js) gesetzt: Grund, Spielstand zu dem Zeitpunkt, Zeitstempel.
+    // Grundlage für die Hall of Fame.
+    retirement: null,
+
     marketValue: 0, // unten per calculateMarketValue gesetzt (braucht attributes/skills)
     retired: false,
     status: 'aktiv'
@@ -163,6 +174,21 @@ export function loadPlayer(playerId) {
 
 export function loadPlayers(playerIds) {
   return playerIds.map(loadPlayer).filter(Boolean);
+}
+
+// Hall of Fame: Spieler bleiben nach Zwangsrente in localStorage erhalten
+// (nur nicht mehr in club.roster) – diese Funktion findet sie direkt über
+// die vorhandenen Spieler-Keys, statt eine separate Liste am Club zu führen,
+// die veralten könnte (gleiches Prinzip wie listClubIds).
+export function loadRetiredPlayersForClub(clubId) {
+  const results = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith(playerKey(''))) continue;
+    const player = JSON.parse(localStorage.getItem(key));
+    if (player.clubId === clubId && player.retired) results.push(player);
+  }
+  return results;
 }
 
 // Manuelle Sicherung: bündelt Club + kompletten Kader in eine JSON-Datei und

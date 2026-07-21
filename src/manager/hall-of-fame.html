@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Hiveball Manager – Hall of Fame</title>
+<link rel="stylesheet" href="manager.css">
+</head>
+<body>
+<div id="app-header"></div>
+<h1>Hall of Fame</h1>
+<p class="hint">
+  Spieler, die den Kader endgültig verlassen haben (Zwangsrente: Alter,
+  Attribut auf Minimum gefallen, oder die Sonderchance bei "Schwerster
+  Verletzung"). "Ausgeschieden nach Spiel" bezieht sich auf
+  <code>gamesPlayedTotal</code> zum Zeitpunkt des Ausscheidens – es gibt
+  keine echte Match-Historie, daher keine Gegner/Ergebnis-Angabe.
+</p>
+
+<div id="noClub" hidden><p>Kein Verein gefunden – zuerst auf der Kader-Seite einen Verein anlegen.</p></div>
+
+<div id="view" hidden>
+  <h2 id="clubName"></h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th><th>Position</th><th>Gemachte Spiele</th>
+        <th>Touchdowns</th><th>Verursachte Verletzungen</th>
+        <th>Ausscheidegrund</th><th>Ausgeschieden nach Spiel</th><th>Datum</th>
+      </tr>
+    </thead>
+    <tbody id="hofBody"></tbody>
+  </table>
+  <p id="emptyHint" class="hint" hidden>Noch niemand in der Hall of Fame.</p>
+</div>
+
+<script type="module">
+  import { loadClub, listClubIds, loadRetiredPlayersForClub } from './state.js';
+  import { renderHeader } from './layout.js';
+
+  renderHeader('hall-of-fame');
+
+  const el = (id) => document.getElementById(id);
+
+  const ids = listClubIds();
+  if (ids.length === 0) {
+    el('noClub').hidden = false;
+  } else {
+    const club = loadClub(ids[0]);
+    el('view').hidden = false;
+    el('clubName').textContent = club.name;
+
+    const retired = loadRetiredPlayersForClub(club.clubId)
+      .sort((a, b) => (b.retirement?.retiredAt || 0) - (a.retirement?.retiredAt || 0));
+
+    if (retired.length === 0) {
+      el('emptyHint').hidden = false;
+    }
+
+    const body = el('hofBody');
+    for (const player of retired) {
+      const tr = document.createElement('tr');
+      const cells = [
+        player.name,
+        player.position,
+        player.gamesPlayedTotal,
+        player.careerTouchdowns,
+        player.careerInjuriesCaused,
+        player.retirement?.reason ?? '–',
+        player.retirement ? `Spiel ${player.retirement.gamesPlayedTotal}` : '–',
+        player.retirement ? new Date(player.retirement.retiredAt).toLocaleDateString('de-DE') : '–'
+      ];
+      for (const value of cells) {
+        const td = document.createElement('td');
+        td.textContent = value;
+        tr.appendChild(td);
+      }
+      body.appendChild(tr);
+    }
+  }
+</script>
+</body>
+</html>

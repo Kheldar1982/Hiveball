@@ -4,7 +4,7 @@
 // (Attribut fällt auf <= 1, 8%-Sonderchance bei "Schwerste Verletzung").
 
 import { defaultLeagueConfig } from './leagueConfig.js';
-import { declineRandomAttribute, checkForcedRetirement, retirePlayer } from './aging.js';
+import { declineRandomAttribute, checkForcedRetirement, retirePlayer, checkAgeCycleAndDecline } from './aging.js';
 import { loadPlayer, loadPlayers, savePlayer, saveClub } from './state.js';
 
 function removeFromNomination(playerId, club) {
@@ -35,7 +35,7 @@ export function applyInjurySeverity(player, club, finalSp, config = defaultLeagu
 
   let retired = attributeLost ? checkForcedRetirement(player, club, config) : false;
   if (!retired && entry.retirementChance && Math.random() < entry.retirementChance) {
-    retirePlayer(player, club);
+    retirePlayer(player, club, 'Schwerste Verletzung');
     retired = true;
   }
 
@@ -60,16 +60,29 @@ export function healRosterByOneGame(club, config = defaultLeagueConfig) {
 }
 
 // Wird am Matchende aufgerufen (siehe hiveball.html endGame-Hook):
-// 1) automatische Heilung für den gesamten Kader (Ausfallzähler),
-// 2) Verletzungsschwere für alle, die in DIESEM Match ausgeschieden sind.
-// matchResults: [{ managerPlayerId, finalSp, wasInjured }]
+// 1) automatische Heilung für den gesamten Kader (Ausfallzähler, auch für
+//    nicht am Match beteiligte Spieler),
+// 2) für jeden am Match beteiligten Spieler: Karriere-Statistik fortschreiben,
+//    Alterszyklus/Verfall/Zwangsrente (dasselbe checkAgeCycleAndDecline wie
+//    der Debug-Button "Spiele simulieren" – echte Matches zählen jetzt genauso
+//    als gespieltes Spiel, sonst liefen gamesPlayedTotal und age auseinander),
+// 3) Verletzungsschwere für alle, die in DIESEM Match ausgeschieden sind.
+// matchResults: [{ managerPlayerId, finalSp, wasInjured, touchdowns, injuriesCaused }]
 export function processMatchEndForClub(club, matchResults, config = defaultLeagueConfig) {
   healRosterByOneGame(club, config);
 
   for (const result of matchResults) {
-    if (!result.wasInjured) continue;
     const player = loadPlayer(result.managerPlayerId);
-    if (!player) continue;
-    applyInjurySeverity(player, club, result.finalSp, config);
+    if (!player || player.retired) continue;
+
+    player.careerTouchdowns += result.touchdowns || 0;
+    player.careerInjuriesCaused += result.injuriesCaused || 0;
+    savePlayer(player);
+
+    checkAgeCycleAndDecline(player, club, config);
+
+    if (result.wasInjured) {
+      applyInjurySeverity(player, club, result.finalSp, config);
+    }
   }
 }

@@ -30,10 +30,19 @@ export function declineRandomAttribute(player) {
 }
 
 // Setzt einen Spieler in den Ruhestand: retired/status, entfernt ihn aus
-// Kader und aktueller Nominierung (Formel 3.8, letzter Schritt).
-export function retirePlayer(player, club) {
+// Kader und aktueller Nominierung (Formel 3.8, letzter Schritt). Hält den
+// Grund + Spielstand fest (Grundlage für die Hall of Fame) – der Spieler
+// selbst bleibt in localStorage erhalten, nur nicht mehr im Kader.
+export function retirePlayer(player, club, reason) {
+  if (player.retired) return; // schon im Ruhestand, nicht erneut überschreiben
+
   player.retired = true;
   player.status = 'im_ruhestand';
+  player.retirement = {
+    reason,
+    gamesPlayedTotal: player.gamesPlayedTotal,
+    retiredAt: Date.now()
+  };
   club.roster = club.roster.filter((id) => id !== player.playerId);
   club.lastMatchNomination.starters = club.lastMatchNomination.starters.filter((id) => id !== player.playerId);
   club.lastMatchNomination.bench = club.lastMatchNomination.bench.filter((id) => id !== player.playerId);
@@ -43,10 +52,14 @@ export function retirePlayer(player, club) {
 // physischen Attribut <= 1. Gibt zurück, ob der Spieler dadurch in den
 // Ruhestand gegangen ist.
 export function checkForcedRetirement(player, club, config) {
-  const atMinimum = DECLINABLE_ATTRIBUTES.some((attr) => getAttr(player, attr) <= 1);
-  if (player.age < config.aging.forcedRetirementAge && !atMinimum) return false;
+  if (player.retired) return false;
 
-  retirePlayer(player, club);
+  const tooOld = player.age >= config.aging.forcedRetirementAge;
+  const atMinimum = DECLINABLE_ATTRIBUTES.some((attr) => getAttr(player, attr) <= 1);
+  if (!tooOld && !atMinimum) return false;
+
+  const reason = tooOld && atMinimum ? 'Alter & Attribut-Minimum' : tooOld ? 'Alter' : 'Attribut-Minimum';
+  retirePlayer(player, club, reason);
   return true;
 }
 
