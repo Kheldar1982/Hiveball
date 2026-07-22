@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Hiveball Manager – Medizinische Abteilung</title>
+<link rel="stylesheet" href="manager.css">
+</head>
+<body>
+<div id="app-header"></div>
+<h1>Medizinische Abteilung</h1>
+<p class="hint">
+  Behandlungsplätze (Phase 1i): weist verletzte Spieler einem Platz zu, damit
+  sie schneller wieder einsatzbereit sind. Ohne Behandlung heilt jeder
+  verletzte Spieler automatisch 1 Spiel Ausfallzeit pro Match; mit einem
+  Platz wirkt stattdessen die höhere, levelabhängige Reduktion. Zuweisungen
+  gelten sofort und dauerhaft (keine Sitzung wie beim Trainingscenter), bis
+  der Spieler geheilt ist oder du ihn manuell entfernst.
+</p>
+
+<div id="noClub" hidden><p>Kein Verein gefunden – zuerst auf der Kader-Seite einen Verein anlegen.</p></div>
+
+<div id="view" hidden>
+  <h2 id="clubName"></h2>
+  <p>Level <span id="level"></span> (<span id="slotCount"></span> Behandlungsplätze)</p>
+
+  <div id="slots"></div>
+</div>
+
+<script type="module">
+  import { loadClub, listClubIds, loadPlayers } from './state.js';
+  import { assignToMedicalQueue, removeFromMedicalQueue, isInMedicalQueue } from './medical.js';
+  import { defaultLeagueConfig } from './leagueConfig.js';
+  import { renderHeader } from './layout.js';
+
+  renderHeader('medical');
+
+  const el = (id) => document.getElementById(id);
+
+  let club = null;
+  let roster = [];
+  let editingSlotIndex = null;
+
+  function renderSelectionTable(slotIndex) {
+    const table = document.createElement('table');
+    table.innerHTML = '<thead><tr><th>Spieler</th><th>Position</th><th>Verletzung</th><th>Noch Spiele</th><th></th></tr></thead>';
+    const tbody = document.createElement('tbody');
+
+    const injured = roster.filter((p) => p.injury.gamesRemaining > 0);
+    for (const player of injured) {
+      const alreadyAssigned = isInMedicalQueue(player.playerId, club);
+      const tr = document.createElement('tr');
+      const td = (text) => { const c = document.createElement('td'); c.textContent = text; return c; };
+      tr.appendChild(td(player.name));
+      tr.appendChild(td(player.position));
+      tr.appendChild(td(player.injury.severity ?? '–'));
+      tr.appendChild(td(player.injury.gamesRemaining));
+
+      const actionTd = document.createElement('td');
+      if (alreadyAssigned) {
+        tr.className = 'unavailable';
+        actionTd.textContent = 'bereits in Behandlung';
+      } else {
+        const btn = document.createElement('button');
+        btn.textContent = 'Wählen';
+        btn.addEventListener('click', () => {
+          assignToMedicalQueue(player, club, defaultLeagueConfig);
+          editingSlotIndex = null;
+          render();
+        });
+        actionTd.appendChild(btn);
+      }
+      tr.appendChild(actionTd);
+      tbody.appendChild(tr);
+    }
+
+    if (injured.length === 0) {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 5;
+      td.textContent = 'Keine verletzten Spieler im Kader.';
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    }
+
+    table.appendChild(tbody);
+    return table;
+  }
+
+  function render() {
+    el('clubName').textContent = club.name;
+    const level = club.facilities.medical.level;
+    el('level').textContent = level;
+    const slotCount = defaultLeagueConfig.medical.slotsPerLevel[level];
+    el('slotCount').textContent = slotCount;
+
+    const container = el('slots');
+    container.innerHTML = '';
+
+    for (let i = 0; i < slotCount; i++) {
+      const entry = club.medicalQueue[i];
+      const box = document.createElement('div');
+      box.className = 'slot' + (entry ? '' : ' empty');
+
+      if (entry) {
+        const player = roster.find((p) => p.playerId === entry.playerId);
+        const label = player
+          ? `${player.name} (${player.injury.severity}, noch ${player.injury.gamesRemaining} Spiele)`
+          : entry.playerId;
+        box.appendChild(document.createTextNode(`Slot ${i + 1}: ${label}`));
+
+        const clearBtn = document.createElement('button');
+        clearBtn.textContent = 'Entfernen';
+        clearBtn.addEventListener('click', () => {
+          removeFromMedicalQueue(entry.playerId, club);
+          render();
+        });
+        box.appendChild(clearBtn);
+      } else {
+        box.appendChild(document.createTextNode(`Slot ${i + 1}: leer`));
+        const chooseBtn = document.createElement('button');
+        chooseBtn.textContent = 'Auswählen';
+        chooseBtn.addEventListener('click', () => { editingSlotIndex = editingSlotIndex === i ? null : i; render(); });
+        box.appendChild(chooseBtn);
+      }
+
+      if (editingSlotIndex === i) {
+        box.appendChild(renderSelectionTable(i));
+      }
+
+      container.appendChild(box);
+    }
+  }
+
+  const ids = listClubIds();
+  if (ids.length === 0) {
+    el('noClub').hidden = false;
+  } else {
+    club = loadClub(ids[0]);
+    roster = loadPlayers(club.roster);
+    el('view').hidden = false;
+    render();
+  }
+</script>
+</body>
+</html>

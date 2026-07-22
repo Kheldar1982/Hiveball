@@ -10,7 +10,7 @@ const NAV_ITEMS = [
   { key: 'training', label: 'Trainingscenter', href: 'training.html' },
   { key: 'academy', label: 'Akademie', href: 'academy.html' },
   { key: 'hall-of-fame', label: 'Hall of Fame', href: 'hall-of-fame.html' },
-  { key: 'medical', label: 'Medizinische Abteilung', href: null },
+  { key: 'medical', label: 'Medizinische Abteilung', href: 'medical.html' },
   { key: 'fanSector', label: 'Fan-Sektor', href: null },
   { key: 'fanshop', label: 'Fanshop', href: null },
   { key: 'catering', label: 'Catering', href: null },

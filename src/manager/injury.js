@@ -45,18 +45,35 @@ export function applyInjurySeverity(player, club, finalSp, config = defaultLeagu
   return { label: entry.label, gamesOut: player.injury.gamesRemaining, attributeLost, retired, gesamtwert };
 }
 
-// Ausfallzähler: automatische Heilung von 1 Spiel Ausfallzeit für jeden
-// verletzten Spieler im Kader, unabhängig von Behandlung (Formel 3.7 –
-// medizinisch beschleunigte Reduktion über medicalQueue folgt in Phase 1i).
+// Ausfallzähler (Formel 3.7): automatische Heilung von 1 Spiel Ausfallzeit
+// für jeden verletzten Spieler im Kader, unabhängig von Behandlung. Steht der
+// Spieler zusätzlich in club.medicalQueue (manuell zugewiesener
+// Behandlungsplatz, siehe medical.js/Phase 1i), gilt stattdessen die höhere
+// medizinisch beschleunigte Reduktion nach Gebäude-Level. Ein vollständig
+// geheilter Spieler gibt seinen Behandlungsplatz automatisch wieder frei.
 export function healRosterByOneGame(club, config = defaultLeagueConfig) {
+  const medicalLevel = club.facilities.medical.level;
   const roster = loadPlayers(club.roster);
+  let queueChanged = false;
+
   for (const player of roster) {
     if (player.injury.gamesRemaining > 0) {
-      player.injury.gamesRemaining = Math.max(0, player.injury.gamesRemaining - config.medical.untreatedReductionPerGame);
-      if (player.injury.gamesRemaining === 0) player.injury.severity = null;
+      const treated = club.medicalQueue.some((entry) => entry.playerId === player.playerId);
+      const reduction = treated ? config.medical.treatedReductionPerGame[medicalLevel] : config.medical.untreatedReductionPerGame;
+
+      player.injury.gamesRemaining = Math.max(0, player.injury.gamesRemaining - reduction);
+      if (player.injury.gamesRemaining === 0) {
+        player.injury.severity = null;
+        if (treated) {
+          club.medicalQueue = club.medicalQueue.filter((entry) => entry.playerId !== player.playerId);
+          queueChanged = true;
+        }
+      }
       savePlayer(player);
     }
   }
+
+  if (queueChanged) saveClub(club);
 }
 
 // Wird am Matchende aufgerufen (siehe hiveball.html endGame-Hook):
