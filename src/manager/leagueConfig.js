@@ -1,7 +1,9 @@
 // Default-Konfiguration der Liga (Manager-Teil), siehe
 // docs/hiveball_manager_spezifikation.md Abschnitt 5. Alle Werte hier sind
-// laut Abschnitt 1 der Spezifikation grundsätzlich änderbar (spätere
-// Liga-Settings-UI, Phase 1e); Min/Max-Leitplanken je Feld sind noch offen.
+// laut Abschnitt 1 der Spezifikation grundsätzlich änderbar – seit Phase 1e
+// über settings.html editierbar (siehe Persistenz-/Override-Schicht am
+// Dateiende). Keine harten Min/Max-Leitplanken je Feld (Abschnitt 11 ließ das
+// offen); settings.html erzwingt nur, dass Zahlenfelder nicht negativ sind.
 
 // W<n>-Wurf für die severityTable-Einträge unten (Formel 3.6: "W3+2"/"W4+5").
 // Rein lokal, da die Tabelle selbst in dieser Datei lebt und dieser Helfer
@@ -127,3 +129,69 @@ export const defaultLeagueConfig = {
     maxPerSpecialistPosition: 2
   }
 };
+
+/* ============================================================
+   SETTINGS-UI (Phase 1e): lebender Override von defaultLeagueConfig
+   ============================================================ */
+// Bereiche, die über settings.html editierbar sind. injury.severityTable
+// bleibt bewusst außen vor (Nutzer-Entscheidung): die Einträge enthalten
+// Wurf-Funktionen (gamesOut), die sich nicht als Zahlenfeld abbilden oder
+// nach JSON serialisieren lassen.
+const EDITABLE_SECTIONS = ['training', 'aging', 'medical', 'xp', 'economy', 'roster'];
+
+function deepClone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+// Setzt jeden Blattwert aus source in target, ohne bestehende
+// Zwischen-Objekte im Ziel zu ersetzen – alle 15+ Verbraucher-Dateien lesen
+// defaultLeagueConfig per Objektreferenz zur Laufzeit, eine In-Place-Mutation
+// der Blattwerte reicht deshalb aus (kein Re-Export nötig, keine Datei muss
+// dafür angepasst werden).
+function deepAssign(target, source) {
+  for (const key of Object.keys(source)) {
+    const value = source[key];
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      if (!target[key] || typeof target[key] !== 'object') target[key] = {};
+      deepAssign(target[key], value);
+    } else {
+      target[key] = value;
+    }
+  }
+}
+
+// Werksdefaults der editierbaren Bereiche, eingefroren BEVOR ein evtl.
+// gespeicherter Override angewendet wird – Grundlage für "Zurücksetzen auf
+// Standard" im Settings-UI.
+export const factoryLeagueConfigDefaults = {};
+for (const key of EDITABLE_SECTIONS) factoryLeagueConfigDefaults[key] = deepClone(defaultLeagueConfig[key]);
+
+const OVERRIDES_STORAGE_KEY = 'hiveball:leagueConfigOverrides';
+
+function applyStoredOverrides() {
+  const raw = localStorage.getItem(OVERRIDES_STORAGE_KEY);
+  if (!raw) return;
+  deepAssign(defaultLeagueConfig, JSON.parse(raw));
+}
+applyStoredOverrides();
+
+// Speichert einen (Teil-)Override der editierbaren Bereiche: mutiert das
+// lebende defaultLeagueConfig sofort und persistiert zusätzlich in
+// localStorage, damit er auch nach einem Reload wieder angewendet wird.
+export function saveLeagueConfigOverrides(partial) {
+  deepAssign(defaultLeagueConfig, partial);
+
+  const raw = localStorage.getItem(OVERRIDES_STORAGE_KEY);
+  const stored = raw ? JSON.parse(raw) : {};
+  deepAssign(stored, partial);
+  localStorage.setItem(OVERRIDES_STORAGE_KEY, JSON.stringify(stored));
+}
+
+// Setzt alle editierbaren Bereiche auf die Werksdefaults zurück und löscht
+// den gespeicherten Override vollständig.
+export function resetLeagueConfigToDefaults() {
+  for (const key of EDITABLE_SECTIONS) {
+    deepAssign(defaultLeagueConfig[key], factoryLeagueConfigDefaults[key]);
+  }
+  localStorage.removeItem(OVERRIDES_STORAGE_KEY);
+}

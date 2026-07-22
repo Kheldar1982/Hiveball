@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Hiveball Manager – Einstellungen</title>
+<link rel="stylesheet" href="manager.css">
+</head>
+<body>
+<div id="app-header"></div>
+<h1>Einstellungen</h1>
+<p class="hint">
+  Phase 1e: einfaches Settings-UI für <code>leagueConfig</code> – eine einzige
+  lokale Liga-Instanz, keine Multi-Liga-Struktur. Änderungen gelten sofort für
+  neue Berechnungen (Training, Aging, EP, Kasse, ...) und bleiben auch nach
+  einem Reload gespeichert. Die Verletzungstabelle (Formel 3.6) ist bewusst
+  nicht editierbar, da sie Würfel-Formeln statt reiner Zahlenwerte enthält.
+</p>
+
+<div id="sections"></div>
+
+<p>
+  <button id="save">Speichern</button>
+  <button id="reset">Zurücksetzen auf Standard</button>
+  <span id="savedHint" class="hint" hidden>Gespeichert.</span>
+</p>
+
+<script type="module">
+  import { defaultLeagueConfig, saveLeagueConfigOverrides, resetLeagueConfigToDefaults } from './leagueConfig.js';
+  import { renderHeader } from './layout.js';
+
+  renderHeader('settings');
+
+  const SECTION_LABELS = {
+    training: 'Training',
+    aging: 'Alterung',
+    medical: 'Medizinische Abteilung',
+    xp: 'EP-Vergabe',
+    economy: 'Vereinskasse',
+    roster: 'Kader-Obergrenzen'
+  };
+
+  function humanize(key) {
+    if (/^\d+$/.test(key)) return `Level ${key}`;
+    const spaced = key.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+  }
+
+  // Baut rekursiv ein <fieldset> pro verschachteltem Objekt und eine
+  // Eingabezeile pro Blattwert (Zahl oder Boolean). data-path trägt den
+  // vollen Punkt-Pfad (z.B. "training.physical.maxRepsPerGamePerAttribute"),
+  // damit sich beim Speichern wieder ein passendes verschachteltes Objekt
+  // zusammensetzen lässt.
+  function renderNode(key, value, path, labelOverride) {
+    if (value && typeof value === 'object') {
+      const fieldset = document.createElement('fieldset');
+      const legend = document.createElement('legend');
+      legend.textContent = labelOverride || humanize(key);
+      fieldset.appendChild(legend);
+      for (const [childKey, childValue] of Object.entries(value)) {
+        fieldset.appendChild(renderNode(childKey, childValue, `${path}.${childKey}`));
+      }
+      return fieldset;
+    }
+
+    const row = document.createElement('div');
+    row.className = 'config-row';
+    const label = document.createElement('label');
+    label.textContent = humanize(key);
+
+    let input;
+    if (typeof value === 'boolean') {
+      input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = value;
+    } else {
+      input = document.createElement('input');
+      input.type = 'number';
+      input.step = 'any';
+      input.min = '0';
+      input.value = value;
+    }
+    input.dataset.path = path;
+    label.appendChild(input);
+    row.appendChild(label);
+    return row;
+  }
+
+  function render() {
+    const container = document.getElementById('sections');
+    container.innerHTML = '';
+    for (const [sectionKey, sectionValue] of Object.entries(defaultLeagueConfig)) {
+      if (!(sectionKey in SECTION_LABELS)) continue; // z.B. injury.severityTable: bewusst nicht editierbar
+      container.appendChild(renderNode(sectionKey, sectionValue, sectionKey, SECTION_LABELS[sectionKey]));
+    }
+  }
+
+  // Setzt einen Wert an einem Punkt-Pfad in ein verschachteltes Objekt,
+  // erzeugt fehlende Zwischenebenen bei Bedarf.
+  function setAtPath(target, path, value) {
+    const segments = path.split('.');
+    let node = target;
+    for (let i = 0; i < segments.length - 1; i++) {
+      if (!node[segments[i]]) node[segments[i]] = {};
+      node = node[segments[i]];
+    }
+    node[segments[segments.length - 1]] = value;
+  }
+
+  function collectPartialFromInputs() {
+    const partial = {};
+    document.querySelectorAll('#sections input[data-path]').forEach((input) => {
+      const value = input.type === 'checkbox' ? input.checked : Number(input.value);
+      setAtPath(partial, input.dataset.path, value);
+    });
+    return partial;
+  }
+
+  function showSavedHint() {
+    const hint = document.getElementById('savedHint');
+    hint.hidden = false;
+    setTimeout(() => { hint.hidden = true; }, 2000);
+  }
+
+  document.getElementById('save').addEventListener('click', () => {
+    saveLeagueConfigOverrides(collectPartialFromInputs());
+    render();
+    showSavedHint();
+  });
+
+  document.getElementById('reset').addEventListener('click', () => {
+    resetLeagueConfigToDefaults();
+    render();
+    showSavedHint();
+  });
+
+  render();
+</script>
+</body>
+</html>

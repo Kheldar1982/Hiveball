@@ -83,6 +83,17 @@ ist bewusst zurückgestellt (siehe `docs/hiveball_manager_spezifikation.md`,
 Abschnitt 11) – die reine Einzelzug-Distanz wäre kaum aussagekräftig, dafür
 müsste über mehrere Runden verfolgt werden.
 
+Seit Phase 1e gibt es außerdem `src/manager/settings.html`: ein generischer
+Editor für `leagueConfig` (Training, Aging, Medical, XP, Economy, Roster –
+`injury.severityTable` bleibt bewusst außen vor, da sie Würfel-Formeln statt
+Zahlenwerten enthält). Änderungen werden über `saveLeagueConfigOverrides()`
+sofort in das lebende `defaultLeagueConfig`-Objekt gemergt und zusätzlich in
+`localStorage` gespeichert, sodass sie auch nach einem Reload gelten – alle
+bestehenden Manager-Dateien lesen `defaultLeagueConfig` ohnehin per
+Objektreferenz zur Laufzeit, mussten also nicht angepasst werden.
+„Zurücksetzen auf Standard" stellt die beim Modul-Start eingefrorene
+Werkskopie wieder her.
+
 Zwei Teams: **Blau** (menschlich gesteuert) gegen **Rot** (einfache KI).
 
 **Wichtig seit der Manager-Integration (ES-Module):** normale Browser
@@ -464,6 +475,7 @@ hiveball/
 │       ├── academy.html                        ← Akademie-UI (Theorie-Training/Skills, Slot-Auswahl)
 │       ├── hall-of-fame.html                   ← ausgeschiedene Spieler mit Statistik/Ausscheidegrund
 │       ├── medical.html                        ← Medizinische Abteilung (Behandlungsplätze)
+│       ├── settings.html                       ← Settings-UI für leagueConfig (generischer Editor)
 │       ├── layout.js                           ← gemeinsame Kopfzeile (Logo-Slot + Navigation) aller Seiten
 │       ├── manager.css                         ← gemeinsames Stylesheet (Anthrazit-Theme)
 │       ├── leagueConfig.js                     ← Default-Konfiguration der Liga

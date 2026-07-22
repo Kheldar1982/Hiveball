@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { key: 'fanshop', label: 'Fanshop', href: null },
   { key: 'catering', label: 'Catering', href: null },
   { key: 'stadium', label: 'Stadion', href: null },
+  { key: 'settings', label: 'Einstellungen', href: 'settings.html' },
 ];
 
 export function renderHeader(activeKey) {

@@ -98,6 +98,20 @@ button:hover { border-color: var(--accent); cursor: pointer; }
 
 tr.unavailable { color: var(--text-muted); }
 
+/* Einstellungen (Phase 1e): verschachtelte Fieldsets pro Config-Bereich */
+fieldset {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.8rem;
+}
+fieldset fieldset { background: var(--bg-alt); }
+legend { padding: 0 0.4rem; color: var(--accent); }
+.config-row { display: inline-block; margin: 0.3rem 1rem 0.3rem 0; }
+.config-row label { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; }
+.config-row input[type="number"] { width: 6rem; margin-left: 0; }
+.config-row input[type="checkbox"] { margin-left: 0; }
+
 /* Übersicht: Kennzahlen-Kacheln */
 .card-grid { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0; }
 .card {

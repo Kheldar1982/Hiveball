@@ -677,8 +677,22 @@ Nominierungssperre, Zwangsrente-Anbindung (Formel 3.8).
 **Phase 1i** – Medizinische Abteilung – Behandlungsplätze (Formel 3.7),
 manuelle Zuweisung über `medicalQueue`.
 
-**Phase 1e** – einfaches Settings-UI für `leagueConfig` (lokale Instanz,
-noch keine Multi-Liga-Struktur).
+**Phase 1e** (umgesetzt) – einfaches Settings-UI für `leagueConfig` (lokale
+Instanz, noch keine Multi-Liga-Struktur). Neue Seite `settings.html`
+rendert generisch ein `<fieldset>` je verschachteltem Config-Bereich und ein
+Eingabefeld je Blattwert (Zahl oder Boolean) für `training`, `aging`,
+`medical`, `xp`, `economy`, `roster` – `injury.severityTable` bleibt bewusst
+außen vor, da die Einträge Wurf-Funktionen (`gamesOut`) statt reiner
+Zahlenwerte enthalten. `leagueConfig.js` bekam dafür eine
+Override-/Persistenz-Schicht: `saveLeagueConfigOverrides(partial)` mutiert
+das lebende `defaultLeagueConfig`-Objekt in-place und persistiert zusätzlich
+nach `localStorage`; `resetLeagueConfigToDefaults()` stellt eine beim
+Modul-Start eingefrorene Werkskopie wieder her. Da alle bestehenden
+Verbraucher-Dateien `defaultLeagueConfig` per Objektreferenz zur Laufzeit
+lesen (nie beim Import destrukturieren), wirken Änderungen sofort überall,
+ohne dass eine der bestehenden Dateien angepasst werden musste. Keine
+harten Min/Max-Leitplanken je Feld (siehe Abschnitt 11); die UI verhindert
+nur negative Zahlenwerte.
 
 **Phase 2** – Fan-Sektor, Fanshop, Catering, Stadion, Unterhaltssystem für
 alle Gebäude; manuelle Wechselauswahl für den Menschen (statt automatischer
@@ -698,7 +712,10 @@ Einnahmen-Deckel oder gegnerstärke-Skalierung).
 Diese Punkte wurden im Konzept bewusst nicht abschließend festgelegt und
 sollten zu Beginn der jeweiligen Phase konkretisiert werden:
 
-- Min/Max-Leitplanken je `leagueConfig`-Feld (vor Phase 1e).
+- ~~Min/Max-Leitplanken je `leagueConfig`-Feld~~ – seit Phase 1e geklärt:
+  bewusst keine feldspezifischen Grenzen, nur eine generelle
+  Nicht-negativ-Prüfung in `settings.html`. `injury.severityTable` ist von
+  der Editierbarkeit ganz ausgenommen (Würfel-Formeln, keine reinen Werte).
 - Persistenzmechanismus (localStorage, Datei-Export/Import, o.ä.) – im
   Kernspiel-Kontext bislang bewusst nicht vorhanden.
 - ~~Genaue Definition "Underdog-Block"~~ – seit Phase 1j geklärt: der
