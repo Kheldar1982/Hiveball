@@ -694,6 +694,24 @@ ohne dass eine der bestehenden Dateien angepasst werden musste. Keine
 harten Min/Max-Leitplanken je Feld (siehe Abschnitt 11); die UI verhindert
 nur negative Zahlenwerte.
 
+**Phase 1k** (umgesetzt, Nutzeranfrage – keine eigene Nummer im
+ursprünglichen Phasenplan) – Post-Match-Bildschirm: Overlay direkt in
+`hiveball.html`, das bei `endGame()` automatisch erscheint. Zeigt Endstand,
+Touchdown-Verlauf (Zug/Team/Spieler, aus einem neuen `touchdownLog`-Array,
+das `checkScore()` befüllt), eine kombinierte Spielerliste beider Teams
+(Match-Statistik für alle, Reps/EP zusätzlich für Blau-Spieler mit echter
+Kaderanbindung – Rot hat grundsätzlich keinen persistenten Verein und zeigt
+dafür bewusst nur „–“) sowie die Vereinskasse (Kontostand vorher/nachher,
+Gehaltsabzug, Sieg-/Spieleinnahme). Ein Gebäude-Unterhalt oder weitere
+Einnahmequellen (Zuschauer, Fanshop, ...) existieren als Kostenposten noch
+nicht (Phase 2) und werden deshalb nicht gezeigt, um nichts zu erfinden, das
+es im Code nicht gibt. Zusätzlich, über die Anfrage hinaus: MVP-Hervorhebung,
+Hinweise zu Verletzungen/Zwangsrenten aus diesem Match und dazu, welche
+Spieler durch die Reps in die Trainings-Warteschlange gerutscht sind.
+`processPostMatch` (`postMatch.js`) gibt dafür jetzt eine strukturierte
+Zusammenfassung zurück (`{ mvpId, players, economy }`) statt nur
+Seiteneffekte zu haben, damit die Anzeige keine Formel dupliziert.
+
 **Phase 2** – Fan-Sektor, Fanshop, Catering, Stadion, Unterhaltssystem für
 alle Gebäude; manuelle Wechselauswahl für den Menschen (statt automatischer
 Priorität); zweite Skill-Welle (Feldgeneral, Letzter Ausweg, Auf Kommando –

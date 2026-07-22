@@ -13,6 +13,11 @@
 //   passesCompleted, catches, blocksWon, dodgesSurvived, bombsCompleted,
 //   underdogBlocksWon, repsGained: { bl, st, co, ag, pa }
 // }
+//
+// Rückgabe von processPostMatch (Grundlage für den Post-Match-Bildschirm,
+// Phase 1k): { mvpId, players: [{ managerPlayerId, name, isMvp, xpAwarded,
+// repsGained, queuedAttributes, agingOutcome, injuryOutcome }],
+// economy: { moneyBefore, moneyAfter, salaryTotal, matchIncome } }
 
 import { defaultLeagueConfig } from './leagueConfig.js';
 import { loadPlayer, loadPlayers, savePlayer } from './state.js';
@@ -63,10 +68,15 @@ function calculateXp(result, won, isMvp, config) {
 //    bei erreichter Schwelle), Alterszyklus/Verfall/Zwangsrente,
 // 3) Verletzungsschwere für alle, die in DIESEM Match ausgeschieden sind,
 // 4) Gehaltsabzug + Sieg-/Spieleinnahmen für den Verein (einmal, nicht pro Spieler).
+//
+// Gibt eine Zusammenfassung zurück (Grundlage für den Post-Match-Bildschirm,
+// Phase 1k) statt nur Seiteneffekte auf club/Spieler zu haben – damit muss
+// die Anzeige keine der Formeln (EP, MVP, ...) duplizieren.
 export function processPostMatch(club, matchResults, won, config = defaultLeagueConfig) {
   healRosterByOneGame(club, config);
 
   const mvpId = determineMvpId(matchResults);
+  const playerSummaries = [];
 
   for (const result of matchResults) {
     const player = loadPlayer(result.managerPlayerId);
@@ -74,22 +84,45 @@ export function processPostMatch(club, matchResults, won, config = defaultLeague
 
     player.careerTouchdowns += result.touchdowns || 0;
     player.careerInjuriesCaused += result.injuriesCaused || 0;
-    player.xp += calculateXp(result, won, result.managerPlayerId === mvpId, config);
+    const isMvp = result.managerPlayerId === mvpId;
+    const xpAwarded = calculateXp(result, won, isMvp, config);
+    player.xp += xpAwarded;
     savePlayer(player);
 
     for (const attr of TRAINABLE_ATTRIBUTES) {
       const rawReps = result.repsGained?.[attr] || 0;
       if (rawReps > 0) creditReps(player, club, attr, rawReps, config);
     }
+    const queuedAttributes = TRAINABLE_ATTRIBUTES.filter((attr) =>
+      club.trainingQueue.physical.some((e) => e.playerId === player.playerId && e.attribute === attr)
+    );
 
-    checkAgeCycleAndDecline(player, club, config);
+    const agingOutcome = checkAgeCycleAndDecline(player, club, config);
 
-    if (result.wasInjured) {
-      applyInjurySeverity(player, club, result.finalSp, config);
-    }
+    const injuryOutcome = result.wasInjured
+      ? applyInjurySeverity(player, club, result.finalSp, config)
+      : null;
+
+    playerSummaries.push({
+      managerPlayerId: result.managerPlayerId,
+      name: player.name,
+      isMvp,
+      xpAwarded,
+      repsGained: { ...result.repsGained },
+      queuedAttributes,
+      agingOutcome,
+      injuryOutcome
+    });
   }
 
   const roster = loadPlayers(club.roster);
-  deductSalaries(club, roster, config);
-  payMatchIncome(club, won, config);
+  const moneyBefore = club.money;
+  const salaryTotal = deductSalaries(club, roster, config);
+  const matchIncome = payMatchIncome(club, won, config);
+
+  return {
+    mvpId,
+    players: playerSummaries,
+    economy: { moneyBefore, moneyAfter: club.money, salaryTotal, matchIncome }
+  };
 }

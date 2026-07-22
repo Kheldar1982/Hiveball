@@ -94,6 +94,19 @@ Objektreferenz zur Laufzeit, mussten also nicht angepasst werden.
 „Zurücksetzen auf Standard" stellt die beim Modul-Start eingefrorene
 Werkskopie wieder her.
 
+Seit Phase 1k zeigt `endGame()` außerdem einen Post-Match-Bildschirm
+(Overlay direkt in `hiveball.html`, kein Seitenwechsel): Endstand,
+Touchdown-Verlauf (Zug/Team/Spieler), eine kombinierte Spielerliste beider
+Teams (Match-Statistik für alle, Reps/EP zusätzlich für Blau-Spieler mit
+echter Kaderanbindung – Rot hat grundsätzlich keinen persistenten Verein und
+zeigt dort bewusst „–") sowie die Vereinskasse (Kontostand vorher/nachher,
+Gehälter, Sieg-/Spieleinnahme – ein Gebäude-Unterhalt oder weitere
+Einnahmequellen existieren als Kostenposten noch nicht, das ist Phase 2).
+Dazu MVP-Hervorhebung sowie Hinweise zu Verletzungen/Zwangsrenten und neu
+fürs Training angemeldeten Spielern. `processPostMatch()` in
+`src/manager/postMatch.js` gibt dafür jetzt eine strukturierte
+Zusammenfassung zurück statt nur Seiteneffekte zu haben.
+
 Zwei Teams: **Blau** (menschlich gesteuert) gegen **Rot** (einfache KI).
 
 **Wichtig seit der Manager-Integration (ES-Module):** normale Browser

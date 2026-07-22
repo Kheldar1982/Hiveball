@@ -134,6 +134,47 @@
     color: #9fb0bd;
     line-height: 1.5;
   }
+
+  /* Post-Match-Bildschirm (Phase 1k) */
+  #postgame-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(6, 10, 15, 0.82);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 50;
+  }
+  #postgame-overlay[hidden] { display: none; }
+  #postgame-panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px 24px;
+    max-width: 820px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  #postgame-panel h2 { margin-top: 0; }
+  #postgame-panel h3 { margin: 18px 0 6px; font-size: 1rem; color: var(--accent); }
+  #pg-score-row {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin: 8px 0 16px;
+  }
+  .pg-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-bottom: 8px; }
+  .pg-table th, .pg-table td { border-bottom: 1px solid var(--line); padding: 4px 6px; text-align: left; }
+  .pg-table th { color: #9fb0bd; font-weight: 600; }
+  .pg-mvp { color: var(--accent); font-weight: 700; }
+  .pg-hint { color: #9fb0bd; font-size: 0.8rem; }
+  .pg-economy-row { display: flex; justify-content: space-between; font-size: 0.9rem; padding: 2px 0; }
+  .pg-economy-total { font-weight: 700; border-top: 1px solid var(--line); margin-top: 4px; padding-top: 4px; }
+  #postgame-panel button { margin-top: 16px; }
 </style>
 </head>
 <body>
@@ -196,6 +237,24 @@
   </div>
 </div>
 
+<div id="postgame-overlay" hidden>
+  <div id="postgame-panel">
+    <h2 id="pg-title">Spielende</h2>
+    <div id="pg-score-row"></div>
+
+    <h3>Touchdown-Verlauf</h3>
+    <div id="pg-td-log"></div>
+
+    <h3>Spieler</h3>
+    <div id="pg-players"></div>
+
+    <div id="pg-economy"></div>
+    <div id="pg-notes"></div>
+
+    <button id="pg-continue">Weiter zum Kader</button>
+  </div>
+</div>
+
 <script type="module">
 // Manager-Integration (Phase 1g): Blau wird, falls ein Verein mit
 // vollständiger Matchday-Nominierung existiert, daraus gespeist (siehe
@@ -241,6 +300,11 @@ const WIN_SCORE = 3;
 const MAX_TURNS_PER_TEAM = 10;
 let turnsPlayed = [0, 0]; // Index entspricht TEAM_BLUE / TEAM_RED
 let gameEnded = false;
+
+// Touchdown-Verlauf für den Post-Match-Bildschirm (Phase 1k): wer hat in
+// welchem Zug für welches Team getroffen. turn = Zugnummer des schießenden
+// Teams zum Zeitpunkt des Touchdowns (1-indiziert, analog zur "Züge: X/10"-Anzeige).
+let touchdownLog = [];
 
 /* ============================================================
    POSITIONEN
@@ -423,6 +487,9 @@ function createPlayer(id, number, team, position, x, y, managerPlayer = null) {
   const player = {
     id,           // intern eindeutige ID (über beide Teams hinweg) – für Spiellogik
     number,       // Anzeige-Trikotnummer 1-5, innerhalb des eigenen Teams eindeutig
+    // Anzeigename für den Post-Match-Bildschirm (Phase 1k) – sonst nirgends im
+    // Kernspiel verwendet, das arbeitet bewusst nur mit Trikotnummern.
+    name: managerPlayer ? managerPlayer.name : position,
     team, x, y, position,
     startX: x, startY: y,
     baseStats: { mr: stats.mr, bl: stats.bl, st: stats.st, co: stats.co, ag: stats.ag, pa: stats.pa },
@@ -1004,6 +1071,7 @@ function checkScore(player) {
   if (player.x === teams[player.team].endzoneCol) {
     teams[player.team].score++;
     player.matchTouchdowns++;
+    touchdownLog.push({ team: player.team, number: player.number, name: player.name, turn: turnsPlayed[player.team] + 1 });
     log(`🏈 TOUCHDOWN für ${teams[player.team].name}!`);
     updateScoreboard();
     regenerateStaminaAfterTouchdown();
@@ -1028,7 +1096,8 @@ function endGame(message) {
   document.getElementById('btn-foul').disabled = true;
   document.getElementById('btn-pass').disabled = true;
   document.getElementById('btn-endturn').disabled = true;
-  processManagerPostMatch();
+  const managerResult = processManagerPostMatch();
+  showPostgameScreen(message, managerResult);
   draw();
 }
 
@@ -1038,12 +1107,14 @@ function endGame(message) {
 // Verletzungsschwere, Ausfallzähler-Heilung, Alterszyklus (gamesPlayedTotal)
 // und die Karriere-Statistik für die Hall of Fame verarbeitet. Ohne Verein/
 // Manager-Kader (reiner TEAM_ROSTER-Fallback) passiert nichts.
+// Gibt { club, won, summary } zurück (Grundlage für den Post-Match-Bildschirm,
+// Phase 1k) bzw. null, wenn Blau ohne echten Verein spielt.
 function processManagerPostMatch() {
   const managerBluePlayers = players.filter(p => p.team === TEAM_BLUE && p.managerPlayerId);
-  if (managerBluePlayers.length === 0) return;
+  if (managerBluePlayers.length === 0) return null;
 
   const clubIds = listClubIds();
-  if (clubIds.length === 0) return;
+  if (clubIds.length === 0) return null;
   const club = loadClub(clubIds[0]);
 
   // CO-Sonderregel (Phase 1j, Nutzer-Vorgabe): zusätzlich zur Rep bei
@@ -1070,7 +1141,177 @@ function processManagerPostMatch() {
     underdogBlocksWon: p.matchUnderdogBlocksWon,
     repsGained: { ...p.matchRepsGained }
   }));
-  processPostMatch(club, matchResults, won);
+  const summary = processPostMatch(club, matchResults, won);
+  return { club, won, summary };
+}
+
+// Formatiert die matchRepsGained/repsGained-Struktur als kurze Zeile, z.B.
+// "BL+1 ST+2" – nur Attribute mit tatsächlichem Zuwachs, sonst "–".
+function formatReps(repsGained) {
+  const parts = Object.entries(repsGained)
+    .filter(([, value]) => value > 0)
+    .map(([attr, value]) => `${attr.toUpperCase()}+${value}`);
+  return parts.length ? parts.join(' ') : '–';
+}
+
+const EUR = (n) => `${n.toLocaleString('de-DE')} €`;
+
+// Post-Match-Bildschirm (Phase 1k, Spezifikation Abschnitt 7 Zusatz): zeigt
+// Ergebnis, Touchdown-Verlauf, Spielerliste beider Teams (Reps/EP nur für
+// Blau-Spieler mit echter Kaderanbindung) sowie die Vereinsökonomie. Rot hat
+// grundsätzlich keinen persistenten Verein (kein Reps/EP/Ökonomie-System),
+// daher zeigen dessen Zeilen nur die reinen Match-Statistiken – bewusste
+// Entscheidung, siehe README/Spezifikation. Ökonomie-Posten beschränken sich
+// auf das, was tatsächlich existiert (Gehälter, Sieg-/Spieleinnahme); ein
+// Gebäude-Unterhalt oder weitere Einnahmequellen sind erst Phase 2.
+function showPostgameScreen(message, managerResult) {
+  document.getElementById('pg-title').textContent = message;
+
+  const scoreRow = document.getElementById('pg-score-row');
+  scoreRow.innerHTML = '';
+  const blueScore = document.createElement('span');
+  blueScore.className = 'team-blue';
+  blueScore.textContent = `${teams[TEAM_BLUE].name} ${teams[TEAM_BLUE].score}`;
+  const redScore = document.createElement('span');
+  redScore.className = 'team-red';
+  redScore.textContent = `${teams[TEAM_RED].name} ${teams[TEAM_RED].score}`;
+  scoreRow.append(blueScore, ' : ', redScore);
+
+  const tdLogContainer = document.getElementById('pg-td-log');
+  tdLogContainer.innerHTML = '';
+  if (touchdownLog.length === 0) {
+    const hint = document.createElement('p');
+    hint.className = 'pg-hint';
+    hint.textContent = 'Keine Touchdowns in diesem Match.';
+    tdLogContainer.appendChild(hint);
+  } else {
+    const table = document.createElement('table');
+    table.className = 'pg-table';
+    table.innerHTML = '<thead><tr><th>Zug</th><th>Team</th><th>Spieler</th></tr></thead>';
+    const tbody = document.createElement('tbody');
+    for (const entry of touchdownLog) {
+      const tr = document.createElement('tr');
+      const teamCell = document.createElement('td');
+      teamCell.className = entry.team === TEAM_BLUE ? 'team-blue' : 'team-red';
+      teamCell.textContent = teams[entry.team].name;
+      tr.innerHTML = `<td>${entry.turn}</td>`;
+      tr.appendChild(teamCell);
+      const nameCell = document.createElement('td');
+      nameCell.textContent = `#${entry.number} ${entry.name}`;
+      tr.appendChild(nameCell);
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    tdLogContainer.appendChild(table);
+  }
+
+  const summaryByManagerId = new Map(
+    (managerResult?.summary.players || []).map((p) => [p.managerPlayerId, p])
+  );
+
+  const playersContainer = document.getElementById('pg-players');
+  playersContainer.innerHTML = '';
+  const table = document.createElement('table');
+  table.className = 'pg-table';
+  table.innerHTML = '<thead><tr><th>Team</th><th>Spieler</th><th>TD</th><th>Blocks</th>' +
+    '<th>Fänge</th><th>Pässe</th><th>Dodges</th><th>Reps</th><th>EP</th></tr></thead>';
+  const tbody = document.createElement('tbody');
+  for (const p of players) {
+    const summary = p.managerPlayerId ? summaryByManagerId.get(p.managerPlayerId) : null;
+    const tr = document.createElement('tr');
+    if (summary?.isMvp) tr.classList.add('pg-mvp');
+
+    const teamCell = document.createElement('td');
+    teamCell.className = p.team === TEAM_BLUE ? 'team-blue' : 'team-red';
+    teamCell.textContent = teams[p.team].name;
+    tr.appendChild(teamCell);
+
+    const nameCell = document.createElement('td');
+    nameCell.textContent = `#${p.number} ${p.name}${summary?.isMvp ? ' ★ MVP' : ''}`;
+    tr.appendChild(nameCell);
+
+    const cell = (text) => { const td = document.createElement('td'); td.textContent = text; return td; };
+    tr.appendChild(cell(p.matchTouchdowns));
+    tr.appendChild(cell(p.matchBlocksWon));
+    tr.appendChild(cell(p.matchCatches));
+    tr.appendChild(cell(p.matchPassesCompleted));
+    tr.appendChild(cell(p.matchDodgesSurvived));
+    tr.appendChild(cell(summary ? formatReps(summary.repsGained) : '–'));
+    tr.appendChild(cell(summary ? `+${summary.xpAwarded}` : '–'));
+
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  playersContainer.appendChild(table);
+
+  const economyContainer = document.getElementById('pg-economy');
+  economyContainer.innerHTML = '';
+  const notesContainer = document.getElementById('pg-notes');
+  notesContainer.innerHTML = '';
+
+  if (managerResult) {
+    const { won, summary } = managerResult;
+    const heading = document.createElement('h3');
+    heading.textContent = `Vereinskasse (${teams[TEAM_BLUE].name})`;
+    economyContainer.appendChild(heading);
+
+    const row = (label, amount) => {
+      const div = document.createElement('div');
+      div.className = 'pg-economy-row';
+      div.innerHTML = `<span>${label}</span><span>${amount}</span>`;
+      return div;
+    };
+    economyContainer.appendChild(row('Kontostand vor dem Match', EUR(summary.economy.moneyBefore)));
+    economyContainer.appendChild(row(
+      won ? 'Einnahmen: Siegprämie' : 'Einnahmen: keine (kein Sieg)',
+      `+${EUR(summary.economy.matchIncome)}`
+    ));
+    economyContainer.appendChild(row('Ausgaben: Gehälter', `-${EUR(summary.economy.salaryTotal)}`));
+    const total = row('Kontostand nach dem Match', EUR(summary.economy.moneyAfter));
+    total.classList.add('pg-economy-total');
+    economyContainer.appendChild(total);
+
+    // Verletzungen/Zwangsrenten/Trainings-Warteschlange dieses Matches, sofern
+    // vorhanden – rein informative Zusatzhinweise, kein Teil der Anfrage,
+    // aber naheliegend auf einem Spielabschlussbildschirm.
+    const notes = [];
+    for (const p of summary.players) {
+      if (p.injuryOutcome) {
+        notes.push(`🚑 ${p.name}: ${p.injuryOutcome.label} – ${p.injuryOutcome.gamesOut} Spiele Ausfall` +
+          (p.injuryOutcome.retired ? ' (Zwangsrente!)' : ''));
+      } else if (p.agingOutcome?.retired) {
+        notes.push(`👋 ${p.name} beendet die Karriere (Zwangsrente).`);
+      }
+      if (p.queuedAttributes.length) {
+        notes.push(`📈 ${p.name} bereit fürs Training: ${p.queuedAttributes.map((a) => a.toUpperCase()).join(', ')}`);
+      }
+    }
+    if (notes.length) {
+      const notesHeading = document.createElement('h3');
+      notesHeading.textContent = 'Sonstiges';
+      notesContainer.appendChild(notesHeading);
+      const list = document.createElement('ul');
+      list.style.margin = '0';
+      list.style.paddingLeft = '1.2rem';
+      for (const note of notes) {
+        const li = document.createElement('li');
+        li.textContent = note;
+        list.appendChild(li);
+      }
+      notesContainer.appendChild(list);
+    }
+  } else {
+    const hint = document.createElement('p');
+    hint.className = 'pg-hint';
+    hint.textContent = 'Kein verknüpfter Verein – keine EP/Reps-Gutschrift und keine Vereinskasse für dieses Match.';
+    notesContainer.appendChild(hint);
+  }
+
+  document.getElementById('pg-continue').addEventListener('click', () => {
+    window.location.href = 'manager/overview.html';
+  }, { once: true });
+
+  document.getElementById('postgame-overlay').hidden = false;
 }
 
 // Wird aufgerufen, bevor ein Dodger (sich bewegender Spieler) sein Feld verlässt.
