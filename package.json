@@ -1,0 +1,8 @@
+{
+  "name": "hiveball",
+  "private": true,
+  "description": "Kein echtes npm-Projekt, keine Abhängigkeiten – dieses Manifest existiert nur für den Komfort-Befehl 'npm run dev' (statischer Dev-Server ohne Build-Schritt, siehe scripts/dev-server.mjs).",
+  "scripts": {
+    "dev": "node scripts/dev-server.mjs"
+  }
+}

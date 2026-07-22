@@ -63,9 +63,21 @@ Zwangsrente aus, bleibt sein Datensatz erhalten und erscheint auf der
 
 Zwei Teams: **Blau** (menschlich gesteuert) gegen **Rot** (einfache KI).
 
-Einfach im Browser öffnen (`src/hiveball.html` doppelklicken oder per
-lokalem Server ausliefern) – kein `npm install`, kein Build-Schritt nötig.
-ES-Module funktionieren dabei auch direkt über `file://`.
+**Wichtig seit der Manager-Integration (ES-Module):** normale Browser
+(Chrome/Edge) blockieren `<script type="module">`-Importe über `file://`
+aus Sicherheitsgründen ("Cross origin requests are only supported for
+protocol schemes: http, https, ..."). Doppelklicken auf `src/hiveball.html`
+oder eine `src/manager/*.html`-Seite zeigt dann eine leere/kaputte Seite
+ohne Fehlermeldung im UI (nur in der Browser-Konsole, F12). Daher:
+
+```bash
+node scripts/dev-server.mjs   # oder: npm run dev
+```
+
+und dann `http://localhost:8420/...` statt `file://...` öffnen (siehe
+Konsolen-Ausgabe für die genauen Links). Kein `npm install`, keine
+Abhängigkeiten – `scripts/dev-server.mjs` nutzt nur Node-Bordmittel. Kein
+echter Build-Schritt, nur ein laufender Server-Prozess.
 
 ## 3. Spielfeld & Teams
 
@@ -418,6 +430,9 @@ schwerer als normal.
 ```
 hiveball/
 ├── README.md                                   ← dieses Dokument
+├── package.json                                ← nur für "npm run dev" (kein echtes npm-Projekt, keine Deps)
+├── scripts/
+│   └── dev-server.mjs                          ← statischer Dev-Server (ohne ihn blockieren Browser die ES-Module über file://)
 ├── src/
 │   ├── hiveball.html                           ← Kernspiel-Prototyp (HTML/CSS/JS, keine Deps)
 │   └── manager/                                ← Manager-Teil, im Aufbau (siehe Spezifikation)
