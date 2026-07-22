@@ -4,8 +4,8 @@
 // (Attribut fällt auf <= 1, 8%-Sonderchance bei "Schwerste Verletzung").
 
 import { defaultLeagueConfig } from './leagueConfig.js';
-import { declineRandomAttribute, checkForcedRetirement, retirePlayer, checkAgeCycleAndDecline } from './aging.js';
-import { loadPlayer, loadPlayers, savePlayer, saveClub } from './state.js';
+import { declineRandomAttribute, checkForcedRetirement, retirePlayer } from './aging.js';
+import { loadPlayers, savePlayer, saveClub } from './state.js';
 
 function removeFromNomination(playerId, club) {
   club.lastMatchNomination.starters = club.lastMatchNomination.starters.filter((id) => id !== playerId);
@@ -74,32 +74,4 @@ export function healRosterByOneGame(club, config = defaultLeagueConfig) {
   }
 
   if (queueChanged) saveClub(club);
-}
-
-// Wird am Matchende aufgerufen (siehe hiveball.html endGame-Hook):
-// 1) automatische Heilung für den gesamten Kader (Ausfallzähler, auch für
-//    nicht am Match beteiligte Spieler),
-// 2) für jeden am Match beteiligten Spieler: Karriere-Statistik fortschreiben,
-//    Alterszyklus/Verfall/Zwangsrente (dasselbe checkAgeCycleAndDecline wie
-//    der Debug-Button "Spiele simulieren" – echte Matches zählen jetzt genauso
-//    als gespieltes Spiel, sonst liefen gamesPlayedTotal und age auseinander),
-// 3) Verletzungsschwere für alle, die in DIESEM Match ausgeschieden sind.
-// matchResults: [{ managerPlayerId, finalSp, wasInjured, touchdowns, injuriesCaused }]
-export function processMatchEndForClub(club, matchResults, config = defaultLeagueConfig) {
-  healRosterByOneGame(club, config);
-
-  for (const result of matchResults) {
-    const player = loadPlayer(result.managerPlayerId);
-    if (!player || player.retired) continue;
-
-    player.careerTouchdowns += result.touchdowns || 0;
-    player.careerInjuriesCaused += result.injuriesCaused || 0;
-    savePlayer(player);
-
-    checkAgeCycleAndDecline(player, club, config);
-
-    if (result.wasInjured) {
-      applyInjurySeverity(player, club, result.finalSp, config);
-    }
-  }
 }

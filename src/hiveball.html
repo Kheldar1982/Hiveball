@@ -204,7 +204,8 @@
 // Phase 1h: am Matchende werden SP-Endstand/Ausscheiden für Blau gemeldet
 // (siehe processManagerPostMatch/endGame) – Verletzungsschwere + Ausfallzähler.
 import { listClubIds, loadClub, loadPlayers } from './manager/state.js';
-import { processMatchEndForClub } from './manager/injury.js';
+import { processPostMatch } from './manager/postMatch.js';
+import { defaultLeagueConfig } from './manager/leagueConfig.js';
 
 /* ============================================================
    KONSTANTEN & GRUNDAUFBAU
@@ -444,7 +445,17 @@ function createPlayer(id, number, team, position, x, y, managerPlayer = null) {
     // Match-lokale Zähler für die Hall of Fame (Karriere-Statistik, siehe
     // processManagerPostMatch/injury.js) – kein Teil der Spezifikation.
     matchTouchdowns: 0,
-    matchInjuriesCaused: 0
+    matchInjuriesCaused: 0,
+    // Match-lokale Zähler für Phase 1j (Post-Match-Ergebnisobjekt/Reps-Zählung,
+    // Spezifikation Abschnitt 7 Punkte 5+6) – Grundlage für EP-Vergabe und
+    // Reps-Gutschrift in postMatch.js nach Matchende.
+    matchPassesCompleted: 0,
+    matchCatches: 0,
+    matchBlocksWon: 0,
+    matchDodgesSurvived: 0,
+    matchBombsCompleted: 0,
+    matchUnderdogBlocksWon: 0,
+    matchRepsGained: { bl: 0, st: 0, co: 0, ag: 0, pa: 0 }
   };
   applyEquipment(player);
   player.movesLeft = player.mr;
@@ -723,6 +734,15 @@ function rollOpposed(partsA, partsB) {
 
   return { rawA, rawB, totalA, totalB, winner, note, descA, descB };
 }
+// Reps-Zählung während des Matches (Phase 1j, Spezifikation Abschnitt 7 Punkt 6):
+// jede trainingsrelevante Aktion erhöht player.matchRepsGained[attr] um 1,
+// gedeckelt auf maxRepsPerGamePerAttribute. Die Alters-/Schwellen-Verrechnung
+// selbst passiert erst nach dem Match in postMatch.js (creditReps, training.js).
+function creditMatchRep(player, attr) {
+  const cap = defaultLeagueConfig.training.physical.maxRepsPerGamePerAttribute;
+  if (player.matchRepsGained[attr] < cap) player.matchRepsGained[attr]++;
+}
+
 // Verletzungscheck: Gewinner wirft W10 + eigene ST. Übersteigt das den RW des
 // Verlierers, wird die Differenz von dessen SP abgezogen. Fällt SP dabei auf
 // 0 oder darunter, ist der Verlierer verletzt – sonst bleibt er nur am Boden.
@@ -735,6 +755,14 @@ function resolveInjuryCheck(winner, loser) {
   const injured = loser.sp <= 0;
   const desc = `W10: ${raw} + ST ${winner.st} = ${total}  vs RW ${loser.rw}  →  ` +
     `${damage} Schaden auf SP (${spBefore} → ${loser.sp})`;
+
+  // Reps (Phase 1j, Nutzer-Vorgabe): ST trainiert bei jedem Verletzungscheck-Gewinn,
+  // unabhängig vom Ergebnis. CO trainiert beim Verlierer, wenn der RW den Wurf
+  // komplett abgefangen hat (kein SP-Schaden) – der Spieler "riskiert" SP, verliert
+  // aber keine.
+  creditMatchRep(winner, 'st');
+  if (damage === 0) creditMatchRep(loser, 'co');
+
   return { raw, total, damage, spBefore, spAfter: loser.sp, injured, desc };
 }
 
@@ -949,6 +977,7 @@ function tryPickupBall(player) {
   if (r.success) {
     ball.carrierId = player.id;
     setStatus(`Spieler ${player.number} hat den Ball!`);
+    creditMatchRep(player, 'ag');
     return true;
   } else {
     scatterBallNear(player.x, player.y);
@@ -1017,14 +1046,31 @@ function processManagerPostMatch() {
   if (clubIds.length === 0) return;
   const club = loadClub(clubIds[0]);
 
+  // CO-Sonderregel (Phase 1j, Nutzer-Vorgabe): zusätzlich zur Rep bei
+  // schadenlos überstandenem Verletzungscheck (resolveInjuryCheck) gibt es
+  // einmal pro Spiel eine weitere CO-Rep, sofern die 4er-Obergrenze pro
+  // Attribut und Spiel dadurch noch nicht erreicht ist.
+  const capPerAttribute = defaultLeagueConfig.training.physical.maxRepsPerGamePerAttribute;
+  managerBluePlayers.forEach(p => {
+    if (p.matchRepsGained.co < capPerAttribute) p.matchRepsGained.co++;
+  });
+
+  const won = teams[TEAM_BLUE].score > teams[TEAM_RED].score;
   const matchResults = managerBluePlayers.map(p => ({
     managerPlayerId: p.managerPlayerId,
     finalSp: p.sp,
     wasInjured: p.injured,
     touchdowns: p.matchTouchdowns,
-    injuriesCaused: p.matchInjuriesCaused
+    injuriesCaused: p.matchInjuriesCaused,
+    passesCompleted: p.matchPassesCompleted,
+    catches: p.matchCatches,
+    blocksWon: p.matchBlocksWon,
+    dodgesSurvived: p.matchDodgesSurvived,
+    bombsCompleted: p.matchBombsCompleted,
+    underdogBlocksWon: p.matchUnderdogBlocksWon,
+    repsGained: { ...p.matchRepsGained }
   }));
-  processMatchEndForClub(club, matchResults);
+  processPostMatch(club, matchResults, won);
 }
 
 // Wird aufgerufen, bevor ein Dodger (sich bewegender Spieler) sein Feld verlässt.
@@ -1093,6 +1139,8 @@ function attemptLeavingTackleZones(dodger, destX, destY) {
       }
       return true;
     } else {
+      dodger.matchDodgesSurvived++;
+      creditMatchRep(dodger, 'ag');
       setStatus(`#${dodger.number} entkommt dem Tackle von #${tackler.number}.`);
     }
   }
@@ -1223,6 +1271,10 @@ function attemptPass(passer, target) {
     return;
   }
 
+  // PA trainiert schon am gelungenen Wurf, unabhängig davon, ob der Pass am
+  // Ende gefangen wird (Phase 1j).
+  creditMatchRep(passer, 'pa');
+
   // Wurf war gut genug, jetzt versucht der Zielspieler zu fangen
   const tzCatcher = countEnemyTackleZones(target.x, target.y, target.team);
   const catchResult = rollAgainstTarget(
@@ -1235,6 +1287,10 @@ function attemptPass(passer, target) {
   if (catchResult.success) {
     ball.carrierId = target.id;
     setStatus(`#${target.number} fängt den Pass!`);
+    passer.matchPassesCompleted++;
+    target.matchCatches++;
+    creditMatchRep(target, 'ag');
+    if (fields > 6) passer.matchBombsCompleted++; // "Bombe", siehe passDistanceLabel
     draw();
   } else {
     scatterBallNear(target.x, target.y);
@@ -1307,6 +1363,8 @@ function scatterBallNear(x, y) {
 
 function resolveBlock(attacker, defender) {
   logAction(`Block: ${teams[attacker.team].name} #${attacker.number} vs ${teams[defender.team].name} #${defender.number}`, '🛡️', attacker.team);
+  // BL trainiert schon beim Versuch, unabhängig vom Ausgang (Phase 1j).
+  creditMatchRep(attacker, 'bl');
 
   // 0) Unterstützung ermitteln: Teamkameraden, die in der Tacklezone des jeweiligen
   // Gegenspielers stehen, aber selbst in keiner (weiteren) gegnerischen Tacklezone,
@@ -1358,6 +1416,13 @@ function resolveBlock(attacker, defender) {
     attacker.acted = true;
     draw();
     return;
+  }
+
+  if (winner === attacker) {
+    attacker.matchBlocksWon++;
+    // Underdog-Block (Phase 1j): der Verteidiger hatte den höheren relevanten
+    // Duell-Wert (BL, bzw. AG bei Dodge), gewinnt aber trotzdem nicht.
+    if (defenderAttrValue > attacker.bl) attacker.matchUnderdogBlocksWon++;
   }
 
   // Dodge: Weicht der Geblockte erfolgreich aus (er gewinnt bzw. der Block bleibt

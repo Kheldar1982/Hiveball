@@ -63,6 +63,26 @@ im Kernspiel mitgezählt (`checkScore`, `resolveBlock`,
 Zwangsrente aus, bleibt sein Datensatz erhalten und erscheint auf der
 "Hall of Fame"-Seite mit Statistik + Ausscheidegrund.
 
+Seit Phase 1j zählt das Kernspiel zusätzlich pro Blau-Spieler mit
+Kaderanbindung mit, was für die Post-Match-Auswertung nötig ist: BL bei jedem
+Blockversuch, ST beim Gewinner jedes Verletzungschecks, CO beim Verlierer
+eines schadenlos überstandenen Verletzungschecks (`damage === 0`) sowie
+einmal pro Spiel pauschal (sofern die 4er-Obergrenze dadurch noch nicht
+erreicht ist), AG bei Ballaufnahme/Fang/überstandenem Tackle und PA beim
+gelungenen Wurf – jeweils gedeckelt auf `maxRepsPerGamePerAttribute`.
+`processManagerPostMatch()` baut daraus (plus Touchdowns/Pässen/Fängen/
+gewonnenen Blocks/überstandenen Tackles/Bomben/Underdog-Blocks) ein
+Ergebnisobjekt pro Spieler und übergibt es an `processPostMatch()` in
+`src/manager/postMatch.js`: dort werden EP nach `config.xp.perAction`/
+`bonuses` vergeben (inkl. MVP-Bonus für die höchste Summe aus Touchdowns,
+gewonnenen Blocks, Fängen, Pässen und überstandenen Tackles sowie
+Sieg-Bonus), die Reps über das bestehende `creditReps` (Alters-Modifikator,
+Trainings-Warteschlange bei erreichter Schwelle) gutgeschrieben, und
+Gehalt/Sieg-Einnahmen über `economy.js` verbucht. Ein Lauf-Touchdown-Bonus
+ist bewusst zurückgestellt (siehe `docs/hiveball_manager_spezifikation.md`,
+Abschnitt 11) – die reine Einzelzug-Distanz wäre kaum aussagekräftig, dafür
+müsste über mehrere Runden verfolgt werden.
+
 Zwei Teams: **Blau** (menschlich gesteuert) gegen **Rot** (einfache KI).
 
 **Wichtig seit der Manager-Integration (ES-Module):** normale Browser
@@ -457,7 +477,8 @@ hiveball/
 │       ├── aging.js                            ← Aging-System (Formel 3.5) + Zwangsrente (Formel 3.8)
 │       ├── nomination.js                       ← Matchday-Status je Spieler (Feld/Bank/Frei), direkt im Kader
 │       ├── injury.js                           ← Verletzungsschwere (Formel 3.6) + Ausfallzähler-Heilung
-│       └── medical.js                          ← Behandlungsplätze (Formel 3.7, Slot-Verwaltung)
+│       ├── medical.js                          ← Behandlungsplätze (Formel 3.7, Slot-Verwaltung)
+│       └── postMatch.js                        ← Post-Match-Verarbeitung (EP, Reps-Gutschrift, MVP, Kasse; Abschnitt 4)
 └── docs/
     ├── Hiveball_Manager_Regelwerk_v0_12.pdf     ← ursprüngliches Design-/Regeldokument
     └── hiveball_manager_spezifikation.md        ← technische Spezifikation Manager-Teil

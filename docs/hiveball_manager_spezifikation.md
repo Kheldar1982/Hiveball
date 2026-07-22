@@ -648,17 +648,28 @@ ab Level 3).
 
 **Phase 1g** – Wechsel-Logik in `hiveball.html` (Abschnitt 7, Punkt 3).
 
-**Phase 1j** – Post-Match-Ergebnisobjekt (Abschnitt 7, Punkt 5) und
+**Phase 1j** (umgesetzt) – Post-Match-Ergebnisobjekt (Abschnitt 7, Punkt 5) und
 Reps-Zählung während des Matches (Abschnitt 7, Punkt 6): kleine Zähler pro
-Spieler an den relevanten Stellen im Kernspiel (`checkScore`, `attemptPass`,
-`resolveBlock`, `attemptLeavingTackleZones`, `tryPickupBall`) für
-Touchdowns, Pässe, Fänge, Blocks, Dodges, Bomben, Lauf-Touchdowns,
-Underdog-Blocks sowie `repsGained` pro Attribut (gedeckelt auf
-`maxRepsPerGamePerAttribute`). Aus Abschnitt 7 herausgelöst und als eigene
-Phase nachgetragen, da sie im ursprünglichen Phasenplan keine eigene Nummer
-hatte, aber eine eigenständige, von der reinen Wechsel-Logik (1g) unabhängige
-Integrationsarbeit ist. Grundlage für `postMatch.js` (EP-Vergabe,
-Reps-Gutschrift, Verletzungsschwere, Alterszyklus, Abschnitt 4).
+Spieler an den relevanten Stellen im Kernspiel (`resolveInjuryCheck`,
+`attemptPass`, `resolveBlock`, `attemptLeavingTackleZones`, `tryPickupBall`)
+für Touchdowns, Pässe, Fänge, Blocks, Dodges, Bomben, Underdog-Blocks sowie
+`matchRepsGained` pro Attribut (gedeckelt auf `maxRepsPerGamePerAttribute`
+über `creditMatchRep`). `processManagerPostMatch` (`hiveball.html`) bündelt
+das Ergebnisobjekt je Spieler und ruft `processPostMatch` aus dem neuen
+`src/manager/postMatch.js` auf (EP-Vergabe nach `config.xp.perAction`/
+`bonuses`, MVP-Bonus, Reps-Gutschrift über `creditReps`, Verletzungsschwere,
+Alterszyklus, Gehaltsabzug + Sieg-/Spieleinnahmen über `economy.js`).
+Reps-Zuordnung (Nutzer-Entscheidung, abweichend von einer reinen
+1:1-Ableitung): BL bei jedem Blockversuch (unabhängig vom Ausgang), ST beim
+Gewinner jedes Verletzungschecks (unabhängig vom Ausgang), CO beim Verlierer
+eines Verletzungschecks ohne SP-Schaden (`damage === 0`) *und* zusätzlich
+einmal pro Spiel pauschal (nur falls die Rep-Obergrenze dadurch noch nicht
+erreicht ist), AG bei Ballaufnahme/Fang/überstandenem Tackle, PA beim
+gelungenen Wurf (unabhängig vom Fang). Lauf-Touchdowns (`longRunTD`-Bonus aus
+`config.xp.bonuses`) sind bewusst zurückgestellt – siehe Backlog unten. Aus
+Abschnitt 7 herausgelöst und als eigene Phase nachgetragen, da sie im
+ursprünglichen Phasenplan keine eigene Nummer hatte, aber eine eigenständige,
+von der reinen Wechsel-Logik (1g) unabhängige Integrationsarbeit ist.
 
 **Phase 1h** – Verletzungsschwere-Wurf (Formel 3.6), Ausfallzähler,
 Nominierungssperre, Zwangsrente-Anbindung (Formel 3.8).
@@ -690,9 +701,19 @@ sollten zu Beginn der jeweiligen Phase konkretisiert werden:
 - Min/Max-Leitplanken je `leagueConfig`-Feld (vor Phase 1e).
 - Persistenzmechanismus (localStorage, Datei-Export/Import, o.ä.) – im
   Kernspiel-Kontext bislang bewusst nicht vorhanden.
-- Genaue Definition "Underdog-Block" (z. B. Schwellenwert-Differenz BL/AG,
-  ab wann ein Gegner als "stärker" gilt) für die EP-Bonus-Zählung.
-- MVP-Ermittlungslogik (meiste Einzel-EP im Match vs. andere Metrik).
+- ~~Genaue Definition "Underdog-Block"~~ – seit Phase 1j geklärt: der
+  Verteidiger hatte den höheren relevanten Duell-Wert (BL, bzw. AG bei
+  Dodge-Skill), verliert das Duell aber trotzdem; kein zusätzlicher
+  Schwellenwert.
+- ~~MVP-Ermittlungslogik~~ – seit Phase 1j geklärt: höchste Summe aus
+  Touchdowns, gewonnenen Blocks, Fängen, abgeschlossenen Pässen und
+  überstandenen Tackles im Match (`postMatch.js`, `determineMvpId`).
+- Backlog (aus Phase 1j zurückgestellt): Lauf-Touchdown-Bonus (`longRunTD`).
+  Der reine Einzelzug-Blick (>=5 Felder am Stück) greift kaum, weil ein
+  Läufer/Fänger nach einem Fang ohnehin fast immer >=5 Felder in einem Zug
+  zurücklegt. Für eine sinnvolle Umsetzung müsste über mehrere Runden hinweg
+  die zurückgelegte Distanz eines Laufs verfolgt und der Schwellenwert
+  entsprechend höher angesetzt werden.
 - Marktwert-Formel-Details (Phase 3, aktuell nur Platzhalterfeld im
   Datenmodell vorgesehen).
 - Rückbau/Verkauf von Gebäuden ist aktuell nicht vorgesehen; falls das
