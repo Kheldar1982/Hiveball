@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Hiveball Manager – Nächstes Spiel</title>
+<link rel="stylesheet" href="manager.css">
+</head>
+<body>
+<div id="app-header"></div>
+<h1>Nächstes Spiel</h1>
+
+<div id="noClub" hidden><p>Kein Verein gefunden – zuerst auf der Kader-Seite einen Verein anlegen.</p></div>
+
+<div id="view" hidden>
+  <div class="card-grid">
+    <div class="card">
+      <h3>Nächster Gegner</h3>
+      <div class="value" id="opponentName">Red AI</div>
+    </div>
+  </div>
+
+  <button id="startBtn" class="btn-start">Spiel starten</button>
+
+  <h3>Matchday-Nominierung</h3>
+  <div id="feldSlots"></div>
+  <div id="benchSlots"></div>
+</div>
+
+<script type="module">
+  import { loadClub, listClubIds, loadPlayers } from './state.js';
+  import { getPlayerMatchdayStatus, canSetMatchdayStatus, setPlayerMatchdayStatus } from './nomination.js';
+  import { defaultLeagueConfig } from './leagueConfig.js';
+  import { renderHeader } from './layout.js';
+
+  renderHeader('next-match');
+
+  const el = (id) => document.getElementById(id);
+
+  let club = null;
+  let roster = [];
+  let editingSlot = null; // { type: 'feld' | 'bank', index }
+
+  function renderSelectionTable(type) {
+    const table = document.createElement('table');
+    table.innerHTML = '<thead><tr><th>Spieler</th><th>Position</th><th></th></tr></thead>';
+    const tbody = document.createElement('tbody');
+
+    const candidates = roster.filter((p) =>
+      getPlayerMatchdayStatus(p, club) === 'frei' && canSetMatchdayStatus(p, club, type, defaultLeagueConfig)
+    );
+
+    for (const player of candidates) {
+      const tr = document.createElement('tr');
+      const td = (text) => { const c = document.createElement('td'); c.textContent = text; return c; };
+      tr.appendChild(td(player.name));
+      tr.appendChild(td(player.position));
+
+      const actionTd = document.createElement('td');
+      const btn = document.createElement('button');
+      btn.textContent = 'Wählen';
+      btn.addEventListener('click', () => {
+        setPlayerMatchdayStatus(player, club, type, defaultLeagueConfig);
+        editingSlot = null;
+        render();
+      });
+      actionTd.appendChild(btn);
+      tr.appendChild(actionTd);
+      tbody.appendChild(tr);
+    }
+
+    if (candidates.length === 0) {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 3;
+      td.textContent = 'Keine verfügbaren Spieler.';
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    }
+
+    table.appendChild(tbody);
+    return table;
+  }
+
+  function renderSlotGroup(container, type, count, label) {
+    container.innerHTML = '';
+    const ids = type === 'feld' ? club.lastMatchNomination.starters : club.lastMatchNomination.bench;
+
+    for (let i = 0; i < count; i++) {
+      const playerId = ids[i];
+      const player = playerId ? roster.find((p) => p.playerId === playerId) : null;
+      const box = document.createElement('div');
+
+      if (type === 'feld') {
+        box.className = 'slot ' + (player ? 'feld-filled' : 'feld-empty');
+      } else {
+        box.className = 'slot' + (player ? '' : ' empty');
+      }
+
+      if (player) {
+        box.appendChild(document.createTextNode(`${label} ${i + 1}: ${player.name} (${player.position})`));
+      } else {
+        box.appendChild(document.createTextNode(`${label} ${i + 1}: leer`));
+        const chooseBtn = document.createElement('button');
+        chooseBtn.textContent = 'Auswählen';
+        const isEditing = editingSlot && editingSlot.type === type && editingSlot.index === i;
+        chooseBtn.addEventListener('click', () => {
+          editingSlot = isEditing ? null : { type, index: i };
+          render();
+        });
+        box.appendChild(chooseBtn);
+
+        if (isEditing) box.appendChild(renderSelectionTable(type));
+      }
+
+      container.appendChild(box);
+    }
+  }
+
+  function render() {
+    const starterCount = club.lastMatchNomination.starters.length;
+    const startBtn = el('startBtn');
+    startBtn.disabled = starterCount !== defaultLeagueConfig.roster.startingLineupSize;
+
+    renderSlotGroup(el('feldSlots'), 'feld', defaultLeagueConfig.roster.startingLineupSize, 'Feld');
+    renderSlotGroup(el('benchSlots'), 'bank', defaultLeagueConfig.roster.maxBench, 'Bank');
+  }
+
+  el('startBtn').addEventListener('click', () => {
+    window.location.href = '../hiveball.html';
+  });
+
+  const ids = listClubIds();
+  if (ids.length === 0) {
+    el('noClub').hidden = false;
+  } else {
+    club = loadClub(ids[0]);
+    roster = loadPlayers(club.roster);
+    el('view').hidden = false;
+    render();
+  }
+</script>
+</body>
+</html>

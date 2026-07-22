@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Hiveball Manager – Stadion</title>
+<link rel="stylesheet" href="manager.css">
+</head>
+<body>
+<div id="app-header"></div>
+<h1>Stadion</h1>
+<p class="hint">
+  Stadion, Fanshop und Stadioncatering: Level 1 ist bei allen dreien
+  unterhaltsfrei, ab Level 2 fällt pro Match laufender Unterhalt an (siehe
+  Vereinskasse im Post-Match-Bildschirm). Fanshop und Catering können nie
+  über das aktuelle Stadion-Level hinaus ausgebaut werden.
+</p>
+
+<div id="noClub" hidden><p>Kein Verein gefunden – zuerst auf der Kader-Seite einen Verein anlegen.</p></div>
+
+<div id="view" hidden>
+  <p>Kasse: <span class="money" id="clubMoney"></span> €</p>
+  <div id="facilities"></div>
+</div>
+
+<script type="module">
+  import { loadClub, listClubIds } from './state.js';
+  import { defaultLeagueConfig } from './leagueConfig.js';
+  import { facilityUpgradeCost, canUpgradeFacility, upgradeFacility } from './economy.js';
+  import { renderHeader } from './layout.js';
+
+  renderHeader('stadium');
+
+  const el = (id) => document.getElementById(id);
+  const EUR = (n) => `${n.toLocaleString('de-DE')} €`;
+
+  // Reihenfolge = Anzeigereihenfolge. Fanshop/Catering sind über
+  // maxLevelFrom an das Stadion-Level gekoppelt (Nutzervorgabe: nie höher
+  // ausbaubar als das Stadion selbst).
+  const FACILITIES = [
+    { key: 'stadium', icon: '🏟️', name: 'Stadion' },
+    { key: 'fanshop', icon: '🛍️', name: 'Fanshop', maxLevelFrom: 'stadium' },
+    { key: 'catering', icon: '🌭', name: 'Stadioncatering', maxLevelFrom: 'stadium' }
+  ];
+
+  let club = null;
+
+  function renderFacility(container, def) {
+    const level = club.facilities[def.key].level;
+    const cfg = defaultLeagueConfig.economy[def.key];
+
+    const row = document.createElement('div');
+    row.className = 'facility-row';
+
+    const icon = document.createElement('div');
+    icon.className = 'facility-icon';
+    icon.textContent = def.icon;
+    row.appendChild(icon);
+
+    const name = document.createElement('div');
+    name.className = 'facility-name';
+    name.textContent = def.name;
+    row.appendChild(name);
+
+    const levelEl = document.createElement('div');
+    levelEl.className = 'facility-level';
+    levelEl.appendChild(document.createTextNode(`Level ${level} / ${cfg.maxLevel}`));
+    if (def.maxLevelFrom) {
+      const maxLevel = club.facilities[def.maxLevelFrom].level;
+      const maxHint = document.createElement('div');
+      maxHint.className = 'hint';
+      maxHint.textContent = `(max. ${maxLevel}, durch Stadion begrenzt)`;
+      levelEl.appendChild(maxHint);
+    }
+    row.appendChild(levelEl);
+
+    const cost = document.createElement('span');
+    cost.className = 'facility-cost hint';
+
+    const upgradeBtn = document.createElement('button');
+    const nextCost = facilityUpgradeCost(club, def.key, defaultLeagueConfig);
+
+    if (nextCost == null) {
+      upgradeBtn.textContent = 'Maximales Level erreicht';
+      upgradeBtn.disabled = true;
+      cost.textContent = '–';
+    } else {
+      upgradeBtn.textContent = `Level erhöhen (auf ${level + 1})`;
+      cost.textContent = `Kosten: ${EUR(nextCost)}`;
+      const canUpgrade = canUpgradeFacility(club, def.key, defaultLeagueConfig);
+      upgradeBtn.disabled = !canUpgrade;
+      if (!canUpgrade) {
+        upgradeBtn.title = def.maxLevelFrom && level >= club.facilities[def.maxLevelFrom].level
+          ? 'Erst das Stadion weiter ausbauen'
+          : 'Nicht genug Geld in der Vereinskasse';
+      }
+      upgradeBtn.addEventListener('click', () => {
+        upgradeFacility(club, def.key, defaultLeagueConfig);
+        render();
+      });
+    }
+    row.appendChild(upgradeBtn);
+    row.appendChild(cost);
+
+    container.appendChild(row);
+  }
+
+  function render() {
+    el('clubMoney').textContent = club.money.toLocaleString('de-DE');
+    const container = el('facilities');
+    container.innerHTML = '';
+    FACILITIES.forEach((def) => renderFacility(container, def));
+  }
+
+  const ids = listClubIds();
+  if (ids.length === 0) {
+    el('noClub').hidden = false;
+  } else {
+    club = loadClub(ids[0]);
+    el('view').hidden = false;
+    render();
+  }
+</script>
+</body>
+</html>

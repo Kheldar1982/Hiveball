@@ -10,6 +10,22 @@ import { POSITIONS_MANAGER_EXT } from './positions.js';
 import { skillPrice, skillLimit } from './formulas.js';
 import { savePlayer, saveClub } from './state.js';
 
+// Slot-Budget pro Matchday-Zyklus (siehe training.js für die physische
+// Entsprechung) – bereits verbrauchte Slots stehen in
+// trainingQueue.theoryUsedThisCycle und werden erst beim nächsten Matchende
+// wieder freigegeben (postMatch.js).
+export function theorySlotCount(club, config = defaultLeagueConfig) {
+  return config.training.theory.levels[club.facilities.theoryTraining.level].slots;
+}
+
+export function theorySlotsUsedThisCycle(club) {
+  return (club.trainingQueue.theoryUsedThisCycle || []).length;
+}
+
+export function theorySlotsRemaining(club, config = defaultLeagueConfig) {
+  return Math.max(0, theorySlotCount(club, config) - theorySlotsUsedThisCycle(club));
+}
+
 // Bereits gebankte, aber noch nicht trainierte Käufe zählen sowohl gegen die
 // Preis-Eskalation (3.3) als auch gegen das Skill-Limit (3.4), damit nicht
 // mehr gekauft werden kann, als der Spieler je trainieren könnte.
@@ -51,12 +67,19 @@ export function trainSkill(player, club, skill, config = defaultLeagueConfig) {
   if (queueIndex === -1) {
     throw new Error(`${player.name} steht für ${skill} nicht in der Theorie-Warteschlange`);
   }
+  if (theorySlotsRemaining(club, config) <= 0) {
+    throw new Error('Trainingsbudget für diesen Zyklus bereits ausgeschöpft');
+  }
 
   const bankedIndex = player.bankedSkillPurchases.findIndex((b) => b.skill === skill);
   if (bankedIndex !== -1) player.bankedSkillPurchases.splice(bankedIndex, 1);
 
   player.skills.push(skill);
   club.trainingQueue.theory.splice(queueIndex, 1);
+  club.trainingQueue.theoryUsedThisCycle = [
+    ...(club.trainingQueue.theoryUsedThisCycle || []),
+    { playerId: player.playerId, skill }
+  ];
 
   saveClub(club);
   savePlayer(player);

@@ -6,15 +6,14 @@
 
 const NAV_ITEMS = [
   { key: 'overview', label: 'Übersicht', href: 'overview.html' },
+  { key: 'next-match', label: 'Nächstes Spiel', href: 'next-match.html' },
   { key: 'kader', label: 'Kader', href: 'index.html' },
   { key: 'training', label: 'Trainingscenter', href: 'training.html' },
   { key: 'academy', label: 'Akademie', href: 'academy.html' },
   { key: 'hall-of-fame', label: 'Hall of Fame', href: 'hall-of-fame.html' },
   { key: 'medical', label: 'Medizinische Abteilung', href: 'medical.html' },
-  { key: 'fanSector', label: 'Fan-Sektor', href: null },
-  { key: 'fanshop', label: 'Fanshop', href: null },
-  { key: 'catering', label: 'Catering', href: null },
-  { key: 'stadium', label: 'Stadion', href: null },
+  { key: 'publicRelations', label: 'Öffentlichkeitsarbeit', href: null },
+  { key: 'stadium', label: 'Stadion', href: 'stadium.html' },
   { key: 'settings', label: 'Einstellungen', href: 'settings.html' },
 ];
 

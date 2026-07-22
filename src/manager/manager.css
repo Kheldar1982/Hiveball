@@ -83,6 +83,27 @@ th { background: var(--bg-alt); }
 
 .slot { border: 1px solid var(--border); border-radius: 4px; padding: 0.6rem; margin: 0.5rem 0; background: var(--bg-alt); }
 .slot.empty { color: var(--text-muted); }
+.slot.used { color: var(--text-muted); border-style: dashed; }
+.slot.feld-filled { border-color: #2f9e44; background: rgba(47, 158, 68, 0.15); }
+.slot.feld-empty { border-color: var(--error); background: rgba(255, 107, 107, 0.12); color: var(--text-muted); }
+
+.btn-start {
+  display: block;
+  font-size: 1rem;
+  font-weight: bold;
+  padding: 0.6rem 1.4rem;
+  margin: 0.75rem 0 1.5rem;
+  background: #2f9e44;
+  color: #fff;
+  border-color: #2f9e44;
+}
+.btn-start:hover { border-color: #257a36; cursor: pointer; }
+.btn-start:disabled {
+  background: var(--bg-alt);
+  color: var(--text-muted);
+  border-color: var(--border);
+  cursor: not-allowed;
+}
 
 button, input, select {
   font-size: 0.9rem;
@@ -129,3 +150,19 @@ legend { padding: 0 0.4rem; color: var(--accent); }
   letter-spacing: 0.03em;
 }
 .card .value { font-size: 1.4rem; font-weight: bold; }
+
+/* Stadion-Seite: Gebäude-Zeilen (Stadion/Fanshop/Catering) */
+.facility-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.8rem 1rem;
+  margin: 0.6rem 0;
+  background: var(--bg-alt);
+}
+.facility-icon { font-size: 2rem; line-height: 1; }
+.facility-name { font-weight: bold; min-width: 8rem; }
+.facility-level { min-width: 11rem; }
+.facility-cost { margin-left: auto; }

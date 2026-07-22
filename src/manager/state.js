@@ -90,15 +90,26 @@ export function createClub({ name }) {
       physicalTraining: { level: 1 },
       theoryTraining: { level: 1 },
       medical: { level: 1 },
-      fanSector: { level: 0 },
+      publicRelations: { level: 0 },
       fanshop: { level: 0 },
       catering: { level: 0 },
-      stadium: { level: 0 }
+      // Startet bei Level 1 (kostenlos, wie Trainingscenter/Akademie/
+      // Medizinische Abteilung) statt 0 – ein Verein braucht immer eine
+      // Spielstätte, "kein Stadion" ergibt anders als bei den übrigen
+      // Gebäuden keinen sinnvollen Zustand.
+      stadium: { level: 1 }
     },
 
     trainingQueue: {
       physical: [],
-      theory: []
+      theory: [],
+      // Bereits in diesem Matchday-Zyklus verbrauchte Slots (Phasenplan-Fix:
+      // "Training durchführen" darf nicht beliebig oft hintereinander
+      // geklickt werden, um mehr als slots-viele Trainings pro Zyklus
+      // durchzuführen). Wird bei jedem Matchende zurückgesetzt, siehe
+      // postMatch.js.
+      physicalUsedThisCycle: [],
+      theoryUsedThisCycle: []
     },
     medicalQueue: [],
 
@@ -149,7 +160,32 @@ export function saveClub(club) {
 
 export function loadClub(clubId) {
   const raw = localStorage.getItem(clubKey(clubId));
-  return raw ? JSON.parse(raw) : null;
+  if (!raw) return null;
+  const club = JSON.parse(raw);
+  migrateClub(club);
+  return club;
+}
+
+// Repariert vor der Ökonomie-Überarbeitung gespeicherte Vereine: das Feld
+// hieß ursprünglich "fanSector" (nie mit echter Funktion belegt) und wurde
+// zu "publicRelations" ("Öffentlichkeitsarbeit", jetzt PR-Multiplikator für
+// die Reputationsformel). Ohne diese Migration bliebe club.facilities.publicRelations
+// bei bestehenden Spielständen undefined, was updateReputation()/overview.html
+// mit einem Fehler abbrechen ließe, bevor der Post-Match-Bildschirm erscheint.
+// Rein additiv, kein Datenverlust – wirkt nur in-memory für diesen Ladevorgang,
+// wird aber spätestens beim nächsten saveClub() dauerhaft persistiert.
+function migrateClub(club) {
+  if (club.facilities && club.facilities.fanSector && !club.facilities.publicRelations) {
+    club.facilities.publicRelations = club.facilities.fanSector;
+    delete club.facilities.fanSector;
+  }
+  // Stadion startet seit dem Ökonomie-Redesign bei Level 1 statt 0 (siehe
+  // createClub) – bestehende Vereine hatten faktisch schon immer eine
+  // Spielstätte (sie haben ja Matches bestritten), werden also nachträglich
+  // kostenlos auf Level 1 gehoben statt für immer bei 0 hängen zu bleiben.
+  if (club.facilities && club.facilities.stadium && club.facilities.stadium.level < 1) {
+    club.facilities.stadium.level = 1;
+  }
 }
 
 // Ermittelt alle gespeicherten Club-IDs direkt aus den vorhandenen

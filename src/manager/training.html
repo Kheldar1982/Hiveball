@@ -30,7 +30,7 @@
 
 <script type="module">
   import { loadClub, listClubIds, loadPlayers } from './state.js';
-  import { trainPhysicalAttribute, nextStepFor } from './training.js';
+  import { trainPhysicalAttribute, nextStepFor, physicalSlotCount, physicalSlotsRemaining } from './training.js';
   import { repThreshold, maxAttributeValue } from './formulas.js';
   import { defaultLeagueConfig } from './leagueConfig.js';
   import { renderHeader } from './layout.js';
@@ -52,8 +52,14 @@
     return club.facilities.physicalTraining.level >= 3 ? 2 : 1;
   }
 
+  // Zählt sowohl die aktuelle (ephemere) Auswahl als auch die in diesem
+  // Zyklus bereits verbrauchten Slots desselben Spielers, damit das
+  // Pro-Spieler-Limit über den ganzen Zyklus gilt (nicht nur pro Klick auf
+  // "Training durchführen").
   function countPlayerSlots(playerId, excludeIndex) {
-    return slots.filter((s, i) => i !== excludeIndex && s && s.playerId === playerId).length;
+    const usedCount = (club.trainingQueue.physicalUsedThisCycle || []).filter((e) => e.playerId === playerId).length;
+    const sessionCount = slots.filter((s, i) => i !== excludeIndex && s && s.playerId === playerId).length;
+    return usedCount + sessionCount;
   }
 
   function isRowSelectedElsewhere(entry, slotIndex) {
@@ -120,24 +126,40 @@
   function render() {
     el('clubName').textContent = club.name;
     el('level').textContent = club.facilities.physicalTraining.level;
-    const slotCount = defaultLeagueConfig.training.physical.levels[club.facilities.physicalTraining.level].slots;
+    const slotCount = physicalSlotCount(club, defaultLeagueConfig);
     el('slotCount').textContent = slotCount;
 
-    if (slots.length !== slotCount) {
-      slots = new Array(slotCount).fill(null);
+    const usedEntries = club.trainingQueue.physicalUsedThisCycle || [];
+    const remaining = physicalSlotsRemaining(club, defaultLeagueConfig);
+
+    if (slots.length !== remaining) {
+      slots = new Array(remaining).fill(null);
       editingSlotIndex = null;
     }
 
     const container = el('slots');
     container.innerHTML = '';
 
+    // Bereits in diesem Zyklus verbrauchte Slots: gesperrt, erst nach dem
+    // nächsten Match wieder frei (siehe postMatch.js).
+    usedEntries.forEach((entry, i) => {
+      const player = roster.find((p) => p.playerId === entry.playerId);
+      const box = document.createElement('div');
+      box.className = 'slot used';
+      box.appendChild(document.createTextNode(
+        `Slot ${i + 1}: ${player ? player.name : entry.playerId} – ${entry.attribute.toUpperCase()} (bereits in diesem Zyklus trainiert, gesperrt bis zum nächsten Spiel)`
+      ));
+      container.appendChild(box);
+    });
+
     slots.forEach((slot, i) => {
+      const slotNumber = usedEntries.length + i + 1;
       const box = document.createElement('div');
       box.className = 'slot' + (slot ? '' : ' empty');
 
       if (slot) {
         const player = roster.find((p) => p.playerId === slot.playerId);
-        box.appendChild(document.createTextNode(`Slot ${i + 1}: ${player ? player.name : slot.playerId} – ${slot.attribute.toUpperCase()}`));
+        box.appendChild(document.createTextNode(`Slot ${slotNumber}: ${player ? player.name : slot.playerId} – ${slot.attribute.toUpperCase()}`));
 
         const clearBtn = document.createElement('button');
         clearBtn.textContent = 'Leeren';
@@ -149,7 +171,7 @@
         changeBtn.addEventListener('click', () => { editingSlotIndex = editingSlotIndex === i ? null : i; render(); });
         box.appendChild(changeBtn);
       } else {
-        box.appendChild(document.createTextNode(`Slot ${i + 1}: leer`));
+        box.appendChild(document.createTextNode(`Slot ${slotNumber}: leer`));
         const chooseBtn = document.createElement('button');
         chooseBtn.textContent = 'Auswählen';
         chooseBtn.addEventListener('click', () => { editingSlotIndex = editingSlotIndex === i ? null : i; render(); });
@@ -162,6 +184,13 @@
 
       container.appendChild(box);
     });
+
+    if (remaining === 0) {
+      const hint = document.createElement('p');
+      hint.className = 'hint';
+      hint.textContent = 'Trainingsbudget für diesen Zyklus ausgeschöpft – wieder verfügbar nach dem nächsten Spiel.';
+      container.appendChild(hint);
+    }
   }
 
   el('runBtn').addEventListener('click', () => {

@@ -17,14 +17,17 @@
 // Rückgabe von processPostMatch (Grundlage für den Post-Match-Bildschirm,
 // Phase 1k): { mvpId, players: [{ managerPlayerId, name, isMvp, xpAwarded,
 // repsGained, queuedAttributes, agingOutcome, injuryOutcome }],
-// economy: { moneyBefore, moneyAfter, salaryTotal, matchIncome } }
+// economy: { moneyBefore, moneyAfter, salaryTotal,
+//   income: { attendance, fanshop, catering, sponsor, winBonus, total },
+//   facilityUpkeep: { stadium, fanshop, catering, total },
+//   reputationBefore, reputationAfter, reputationDelta } }
 
 import { defaultLeagueConfig } from './leagueConfig.js';
-import { loadPlayer, loadPlayers, savePlayer } from './state.js';
+import { loadPlayer, loadPlayers, savePlayer, saveClub } from './state.js';
 import { healRosterByOneGame, applyInjurySeverity } from './injury.js';
 import { checkAgeCycleAndDecline } from './aging.js';
 import { creditReps, TRAINABLE_ATTRIBUTES } from './training.js';
-import { deductSalaries, payMatchIncome } from './economy.js';
+import { deductSalaries, payMatchIncome, updateReputation, deductFacilityUpkeep } from './economy.js';
 
 // MVP (Spezifikation Abschnitt 4): höchste Summe aus Touchdowns, gewonnenen
 // Blocks, Fängen, abgeschlossenen Pässen und überstandenen Tackles im Match.
@@ -73,6 +76,13 @@ function calculateXp(result, won, isMvp, config) {
 // Phase 1k) statt nur Seiteneffekte auf club/Spieler zu haben – damit muss
 // die Anzeige keine der Formeln (EP, MVP, ...) duplizieren.
 export function processPostMatch(club, matchResults, won, config = defaultLeagueConfig) {
+  // Neuer Matchday-Zyklus: Trainingscenter/Akademie-Slotbudget wieder freigeben
+  // (siehe training.js/skills.js – "Training durchführen" darf pro Zyklus nur
+  // bis zum Level-Limit genutzt werden, nicht beliebig oft hintereinander).
+  club.trainingQueue.physicalUsedThisCycle = [];
+  club.trainingQueue.theoryUsedThisCycle = [];
+  saveClub(club);
+
   healRosterByOneGame(club, config);
 
   const mvpId = determineMvpId(matchResults);
@@ -117,12 +127,28 @@ export function processPostMatch(club, matchResults, won, config = defaultLeague
 
   const roster = loadPlayers(club.roster);
   const moneyBefore = club.money;
-  const salaryTotal = deductSalaries(club, roster, config);
-  const matchIncome = payMatchIncome(club, won, config);
+  // Wer tatsächlich auf dem Feld stand (nicht nur die Vor-Match-Nominierung)
+  // - matchResults enthält jeden Blau-Spieler, der im Match mitspielte,
+  // inklusive Einwechslungen (siehe hiveball.html substituteInjuredPlayers).
+  const playedPlayerIds = new Set(matchResults.map((r) => r.managerPlayerId));
+  const salaryTotal = deductSalaries(club, roster, playedPlayerIds, config);
+  const income = payMatchIncome(club, won, config);
+  const facilityUpkeep = deductFacilityUpkeep(club, config);
+  const reputationBefore = club.reputation;
+  const reputationDelta = updateReputation(club, won, config);
 
   return {
     mvpId,
     players: playerSummaries,
-    economy: { moneyBefore, moneyAfter: club.money, salaryTotal, matchIncome }
+    economy: {
+      moneyBefore,
+      moneyAfter: club.money,
+      salaryTotal,
+      income,
+      facilityUpkeep,
+      reputationBefore,
+      reputationAfter: club.reputation,
+      reputationDelta
+    }
   };
 }

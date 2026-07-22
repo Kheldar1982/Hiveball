@@ -21,6 +21,23 @@ function alreadyQueued(club, playerId, attr) {
   return club.trainingQueue.physical.some((entry) => entry.playerId === playerId && entry.attribute === attr);
 }
 
+// Slot-Budget pro Matchday-Zyklus (Level-abhängig, siehe leagueConfig).
+// Bereits verbrauchte Slots stehen in trainingQueue.physicalUsedThisCycle
+// und werden erst beim nächsten Matchende wieder freigegeben (postMatch.js),
+// damit "Training durchführen" nicht beliebig oft hintereinander mehr als
+// slots-viele Trainings pro Zyklus durchführen kann.
+export function physicalSlotCount(club, config = defaultLeagueConfig) {
+  return config.training.physical.levels[club.facilities.physicalTraining.level].slots;
+}
+
+export function physicalSlotsUsedThisCycle(club) {
+  return (club.trainingQueue.physicalUsedThisCycle || []).length;
+}
+
+export function physicalSlotsRemaining(club, config = defaultLeagueConfig) {
+  return Math.max(0, physicalSlotCount(club, config) - physicalSlotsUsedThisCycle(club));
+}
+
 // rawReps sollte bereits pro Spiel auf maxRepsPerGamePerAttribute gedeckelt
 // sein (Spezifikation 2.1 "repsThisGame") – diese Deckelung passiert im
 // Kernspiel/Post-Match (Phase 1g), hier wird nur noch der Alters-Modifikator
@@ -55,12 +72,19 @@ export function trainPhysicalAttribute(player, club, attr, config = defaultLeagu
   if (index === -1) {
     throw new Error(`${player.name} steht für ${attr.toUpperCase()} nicht in der Trainingswarteschlange`);
   }
+  if (physicalSlotsRemaining(club, config) <= 0) {
+    throw new Error('Trainingsbudget für diesen Zyklus bereits ausgeschöpft');
+  }
 
   const threshold = repThreshold(nextStepFor(player, attr), config);
   player.attributes[attr].current += 1;
   player.reps[attr] -= threshold;
 
   club.trainingQueue.physical.splice(index, 1);
+  club.trainingQueue.physicalUsedThisCycle = [
+    ...(club.trainingQueue.physicalUsedThisCycle || []),
+    { playerId: player.playerId, attribute: attr }
+  ];
 
   saveClub(club);
   savePlayer(player);

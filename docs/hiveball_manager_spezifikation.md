@@ -137,10 +137,10 @@ erhalten und zählt sofort in Richtung des nächsten Punkts).
     physicalTraining: { level: 1 },
     theoryTraining:   { level: 1 },
     medical:          { level: 1 },
-    fanSector:        { level: 0 },   // Phase 2
+    publicRelations:  { level: 0 },   // Phase 2 ("Öffentlichkeitsarbeit", vormals "Fan-Sektor")
     fanshop:          { level: 0 },   // Phase 2
     catering:         { level: 0 },   // Phase 2
-    stadium:          { level: 0 }    // Phase 2
+    stadium:          { level: 1 }    // Phase 2 – kostenlos wie physicalTraining/theoryTraining/medical (ein Verein braucht immer eine Spielstätte, "Level 0" ergäbe keinen Sinn)
   },
 
   // Warteschlangen für die manuelle Slot-Vergabe nach jedem Spiel
@@ -712,7 +712,7 @@ Spieler durch die Reps in die Trainings-Warteschlange gerutscht sind.
 Zusammenfassung zurück (`{ mvpId, players, economy }`) statt nur
 Seiteneffekte zu haben, damit die Anzeige keine Formel dupliziert.
 
-**Phase 2** – Fan-Sektor, Fanshop, Catering, Stadion, Unterhaltssystem für
+**Phase 2** – Öffentlichkeitsarbeit (vormals "Fan-Sektor"), Fanshop, Catering, Stadion, Unterhaltssystem für
 alle Gebäude; manuelle Wechselauswahl für den Menschen (statt automatischer
 Priorität); zweite Skill-Welle (Feldgeneral, Letzter Ausweg, Auf Kommando –
 Details in README/Konzept-Zusammenfassung); Marktwert-Formel-Vorarbeit.

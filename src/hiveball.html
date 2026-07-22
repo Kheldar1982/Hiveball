@@ -1161,9 +1161,10 @@ const EUR = (n) => `${n.toLocaleString('de-DE')} €`;
 // Blau-Spieler mit echter Kaderanbindung) sowie die Vereinsökonomie. Rot hat
 // grundsätzlich keinen persistenten Verein (kein Reps/EP/Ökonomie-System),
 // daher zeigen dessen Zeilen nur die reinen Match-Statistiken – bewusste
-// Entscheidung, siehe README/Spezifikation. Ökonomie-Posten beschränken sich
-// auf das, was tatsächlich existiert (Gehälter, Sieg-/Spieleinnahme); ein
-// Gebäude-Unterhalt oder weitere Einnahmequellen sind erst Phase 2.
+// Entscheidung, siehe README/Spezifikation. Ökonomie-Posten zeigen die
+// aufgeschlüsselten Einnahmen (Zuschauer/Sponsor/Siegprämie/Fanshop/
+// Catering, siehe economy.js) sowie Gehälter, Gebäude-Unterhalt und die
+// Reputationsänderung.
 function showPostgameScreen(message, managerResult) {
   document.getElementById('pg-title').textContent = message;
 
@@ -1261,15 +1262,31 @@ function showPostgameScreen(message, managerResult) {
       div.innerHTML = `<span>${label}</span><span>${amount}</span>`;
       return div;
     };
+    const { income } = summary.economy;
     economyContainer.appendChild(row('Kontostand vor dem Match', EUR(summary.economy.moneyBefore)));
-    economyContainer.appendChild(row(
-      won ? 'Einnahmen: Siegprämie' : 'Einnahmen: keine (kein Sieg)',
-      `+${EUR(summary.economy.matchIncome)}`
-    ));
+    economyContainer.appendChild(row('Einnahmen: Zuschauer', `+${EUR(income.attendance)}`));
+    economyContainer.appendChild(row('Einnahmen: Sponsor', `+${EUR(income.sponsor)}`));
+    if (income.winBonus > 0) {
+      economyContainer.appendChild(row('Einnahmen: Siegprämie', `+${EUR(income.winBonus)}`));
+    }
+    if (income.fanshop > 0) {
+      economyContainer.appendChild(row('Einnahmen: Fanshop', `+${EUR(income.fanshop)}`));
+    }
+    if (income.catering > 0) {
+      economyContainer.appendChild(row('Einnahmen: Catering', `+${EUR(income.catering)}`));
+    }
     economyContainer.appendChild(row('Ausgaben: Gehälter', `-${EUR(summary.economy.salaryTotal)}`));
+    if (summary.economy.facilityUpkeep.total > 0) {
+      economyContainer.appendChild(row('Ausgaben: Gebäude-Unterhalt', `-${EUR(summary.economy.facilityUpkeep.total)}`));
+    }
     const total = row('Kontostand nach dem Match', EUR(summary.economy.moneyAfter));
     total.classList.add('pg-economy-total');
     economyContainer.appendChild(total);
+    const { reputationBefore, reputationAfter, reputationDelta } = summary.economy;
+    economyContainer.appendChild(row(
+      'Reputation',
+      `${reputationBefore.toFixed(1)} → ${reputationAfter.toFixed(1)} (${reputationDelta >= 0 ? '+' : ''}${reputationDelta.toFixed(2)})`
+    ));
 
     // Verletzungen/Zwangsrenten/Trainings-Warteschlange dieses Matches, sofern
     // vorhanden – rein informative Zusatzhinweise, kein Teil der Anfrage,

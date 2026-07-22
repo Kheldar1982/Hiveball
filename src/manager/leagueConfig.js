@@ -97,8 +97,74 @@ export const defaultLeagueConfig = {
 
   economy: {
     startingCapital: 200000,
-    salaryPercentOfMarketValue: 0.09,
-    winPrize: 5000,
+
+    // Gehälter (Ökonomie-Redesign): gestaffelt nach der tatsächlichen Rolle
+    // in DIESEM Match, nicht nach der reinen Vor-Match-Nominierung – siehe
+    // economy.js deductSalaries. "feld" gilt auch für Spieler, die erst durch
+    // Einwechslung während des Matches aufs Feld kamen.
+    salaryRates: {
+      feld: 0.10,
+      bank: 0.05,
+      frei: 0.02
+    },
+
+    winPrize: 8000,
+    sponsorIncome: 20000,
+
+    // Zuschauereinnahme = (Reputation * reputationFactor) * Würfelergebnis.
+    // Die Würfelgröße hängt vom Stadion-Level ab – jede Stufe verbessert den
+    // Würfel spürbar, größere Sprünge bei den teureren oberen Stufen.
+    attendance: {
+      reputationFactor: 100,
+      diceSidesByStadiumLevel: { 1: 6, 2: 8, 3: 10, 4: 15, 5: 20 }
+    },
+
+    // Stadion: kein eigener Ertrag, nur der Würfel-Hebel oben + die
+    // Obergrenze für Fanshop/Catering (siehe canUpgradeFacility). Startet bei
+    // Level 1 (kostenlos, Teil der Vereinsgründung – ein Verein braucht immer
+    // irgendeine Spielstätte, "Level 0" ergibt keinen Sinn). upgradeCost hat
+    // deshalb keinen Eintrag für Level 1.
+    stadium: {
+      maxLevel: 5,
+      upgradeCost: { 2: 60000, 3: 150000, 4: 375000, 5: 900000 },
+      upkeepByLevel: { 1: 0, 2: 6000, 3: 13500, 4: 37000, 5: 67000 }
+    },
+
+    // Fanshop: ergebnisunabhängig, skaliert relativ zur Referenz-Reputation
+    // (Startwert). Darf nie über das aktuelle Stadion-Level hinaus ausgebaut
+    // werden (siehe economy.js canUpgradeFacility).
+    fanshop: {
+      baseIncomeByLevel: { 0: 0, 1: 3000, 2: 6000, 3: 10000, 4: 15000, 5: 21000 },
+      reputationReference: 50,
+      maxLevel: 5,
+      upgradeCost: { 1: 15000, 2: 40000, 3: 95000, 4: 235000, 5: 585000 },
+      upkeepByLevel: { 1: 0, 2: 3500, 3: 8200, 4: 12000, 5: 17400 }
+    },
+
+    // Catering: fester Prozentsatz der Zuschauereinnahme DIESES Matches,
+    // zusätzlich zu ihr (kein Abzug) – die Reputationsabhängigkeit kommt so
+    // automatisch über die Zuschauereinnahme mit, braucht keinen eigenen
+    // Reputationsfaktor. Prozentsatz steigt pro Level (teurere Speisen). Auch
+    // hier gilt die Stadion-Obergrenze.
+    catering: {
+      percentOfAttendanceByLevel: { 0: 0, 1: 0.05, 2: 0.08, 3: 0.12, 4: 0.17, 5: 0.23 },
+      maxLevel: 5,
+      upgradeCost: { 1: 5000, 2: 12000, 3: 30000, 4: 75000, 5: 190000 },
+      upkeepByLevel: { 1: 0, 2: 1300, 3: 2700, 4: 3700, 5: 5300 }
+    },
+
+    // Reputationsänderung nach Elo-Prinzip (economy.js updateReputation).
+    // opponentReputation ist ein Platzhalter, solange es nur den festen
+    // KI-Gegner "Red AI" ohne eigenes Vereinsmodell gibt (echte Gegner/Liga
+    // erst Phase 3). prMultiplierByLevel kommt vom Level der
+    // Öffentlichkeitsarbeit.
+    reputation: {
+      opponentReputation: 50,
+      k: 6,
+      eloScale: 50,
+      prMultiplierByLevel: { 0: 1.0, 1: 1.1, 2: 1.2, 3: 1.3, 4: 1.4, 5: 1.5 }
+    },
+
     basePricesByPosition: {
       Lineman: 30000,
       Blocker: 50000,
@@ -113,7 +179,6 @@ export const defaultLeagueConfig = {
       perExtraAttributePoint: 2500,
       perExtraSkill: 10000
     }
-    // ticketIncome, fanshopIncome etc. folgen in Phase 2
   },
 
   roster: {
