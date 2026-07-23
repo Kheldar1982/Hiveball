@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Hiveball Manager – Öffentlichkeitsarbeit</title>
+<link rel="stylesheet" href="manager.css">
+</head>
+<body>
+<div id="app-header"></div>
+<h1>Öffentlichkeitsarbeit</h1>
+<p class="hint">
+  Verstärkt die Reputationsänderung nach jedem Match – aber immer zum
+  Vorteil des Vereins: bei einem Sieg wird der Gewinn verstärkt (+10 % pro
+  Level), bei einer Niederlage wird der Verlust gedämpft (−10 % pro Level).
+  Öffentlichkeitsarbeit kann die Reputation also nie stärker sinken lassen,
+  als sie es ohnehin täte.
+</p>
+
+<div id="noClub" hidden><p>Kein Verein gefunden – zuerst auf der Kader-Seite einen Verein anlegen.</p></div>
+
+<div id="view" hidden>
+  <p>Kasse: <span class="money" id="clubMoney"></span> €</p>
+  <div id="facilityUpgrade"></div>
+</div>
+
+<script type="module">
+  import { loadClub, listClubIds } from './state.js';
+  import { renderFacilityUpgradeRow } from './facilityUpgradeUI.js';
+  import { renderHeader } from './layout.js';
+
+  renderHeader('publicRelations');
+
+  const el = (id) => document.getElementById(id);
+
+  let club = null;
+
+  function render() {
+    el('clubMoney').textContent = club.money.toLocaleString('de-DE');
+    el('facilityUpgrade').replaceChildren(
+      renderFacilityUpgradeRow(club, 'publicRelations', '📣', 'Öffentlichkeitsarbeit', render)
+    );
+  }
+
+  const ids = listClubIds();
+  if (ids.length === 0) {
+    el('noClub').hidden = false;
+  } else {
+    club = loadClub(ids[0]);
+    el('view').hidden = false;
+    render();
+  }
+</script>
+</body>
+</html>

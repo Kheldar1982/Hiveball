@@ -20,20 +20,31 @@ function rollDie(sides) {
 // Einwechselspieler, die vor dem Match nur auf der Bank nominiert waren.
 // Wer nicht gespielt hat, aber auf der Bank nominiert war, zahlt den
 // Bank-Satz; alle übrigen (frei/Reserve) den niedrigsten Satz.
+//
+// Skill "Sponsor" (Nutzervorgabe): kehrt genau diesen Betrag für den
+// betreffenden Spieler um – kein Gehalt fällig, stattdessen derselbe Wert als
+// zusätzliche Sponsoreneinnahme für den Verein. Gibt deshalb beide Summen
+// getrennt zurück statt nur des Gehalts-Totals.
 export function deductSalaries(club, players, playedPlayerIds, config = defaultLeagueConfig) {
   const rates = config.economy.salaryRates;
-  const total = players.reduce((sum, p) => {
+  let salaryTotal = 0;
+  let sponsorSkillIncome = 0;
+
+  for (const p of players) {
     const rate = playedPlayerIds.has(p.playerId)
       ? rates.feld
       : club.lastMatchNomination.bench.includes(p.playerId)
         ? rates.bank
         : rates.frei;
-    return sum + Math.round(p.marketValue * rate);
-  }, 0);
+    const amount = Math.round(p.marketValue * rate);
 
-  club.money -= total;
+    if (p.skills.includes('Sponsor')) sponsorSkillIncome += amount;
+    else salaryTotal += amount;
+  }
+
+  club.money += sponsorSkillIncome - salaryTotal;
   saveClub(club);
-  return total;
+  return { salaryTotal, sponsorSkillIncome };
 }
 
 // Zuschauereinnahme: Reputation bestimmt den Geldwert pro Würfel-Pip, das
@@ -49,19 +60,20 @@ function calculateAttendanceIncome(club, config) {
 
 // Fanshop: ergebnisunabhängig, skaliert relativ zur Referenz-Reputation
 // (z.B. Startwert) – über/unterdurchschnittliche Reputation hebt/senkt die
-// Einnahme proportional zum Nennwert des Levels.
-function calculateFanshopIncome(club, config) {
+// Einnahme proportional zum Nennwert des Levels. Exportiert, da auch
+// previewNextMatchEconomy (finances.html) sie braucht.
+export function calculateFanshopIncome(club, config) {
   const cfg = config.economy.fanshop;
   const base = cfg.baseIncomeByLevel[club.facilities.fanshop.level] ?? 0;
   return Math.round(base * (club.reputation / cfg.reputationReference));
 }
 
-// Catering: fester Prozentsatz der Zuschauereinnahme DIESES Matches,
-// zusätzlich zu ihr (kein Abzug von den Eintrittsgeldern) – erbt die
+// Catering: fester Prozentsatz der übergebenen Zuschauereinnahme, zusätzlich
+// zu ihr (kein Abzug von den Eintrittsgeldern) – erbt die
 // Reputationsabhängigkeit automatisch von der Zuschauereinnahme, braucht
 // keinen eigenen Reputationsfaktor. Der Prozentsatz steigt pro Level
-// (teurere Speisen im Angebot).
-function calculateCateringIncome(club, attendanceIncome, config) {
+// (teurere Speisen im Angebot). Exportiert wie calculateFanshopIncome.
+export function calculateCateringIncome(club, attendanceIncome, config) {
   const percent = config.economy.catering.percentOfAttendanceByLevel[club.facilities.catering.level] ?? 0;
   return Math.round(attendanceIncome * percent);
 }
@@ -86,19 +98,24 @@ export function payMatchIncome(club, won, config = defaultLeagueConfig) {
 
 // Reputationsänderung nach Sieg/Niederlage (Elo-Prinzip): der Erwartungswert
 // ergibt sich aus der Differenz zur Gegner-Reputation (Platzhalter, siehe
-// leagueConfig.js – "Red AI" hat noch kein eigenes Vereinsmodell), die
-// tatsächliche Abweichung davon wird mit dem PR-Multiplikator aus dem
-// Öffentlichkeitsarbeit-Level skaliert. Bewusst wie an anderer Stelle im
-// Kernspiel (siehe hiveball.html-Kommentar zum Post-Match-Bildschirm) nur
-// Sieg/Nicht-Sieg, kein eigenes Unentschieden-Signal – das ist ein
-// bestehender, bereits bekannter Gap, kein neuer.
+// leagueConfig.js – "Red AI" hat noch kein eigenes Vereinsmodell). Bewusst
+// wie an anderer Stelle im Kernspiel (siehe hiveball.html-Kommentar zum
+// Post-Match-Bildschirm) nur Sieg/Nicht-Sieg, kein eigenes
+// Unentschieden-Signal – das ist ein bestehender, bereits bekannter Gap,
+// kein neuer.
+// Der PR-Bonus aus dem Öffentlichkeitsarbeit-Level wirkt bewusst asymmetrisch
+// (Nutzervorgabe: PR darf nie zu einem Nachteil führen): bei Sieg verstärkt
+// er den Gewinn (Multiplikator > 1), bei Niederlage dämpft er den Verlust
+// (Multiplikator < 1) – statt wie ein reiner Multiplikator auf die
+// Roh-Differenz auch Niederlagen zu vergrößern.
 // Reputation wird bei 1 nach unten gedeckelt, damit die Zuschauereinnahme
 // (die linear mit Reputation skaliert) nicht ins Negative/degenerieren kann.
 export function updateReputation(club, won, config = defaultLeagueConfig) {
   const cfg = config.economy.reputation;
   const expected = 1 / (1 + Math.pow(10, (cfg.opponentReputation - club.reputation) / cfg.eloScale));
   const actual = won ? 1 : 0;
-  const prMultiplier = cfg.prMultiplierByLevel[club.facilities.publicRelations.level] ?? 1;
+  const prBonus = cfg.prBonusPerLevel * club.facilities.publicRelations.level;
+  const prMultiplier = won ? 1 + prBonus : 1 - prBonus;
 
   const delta = cfg.k * prMultiplier * (actual - expected);
   club.reputation = Math.max(1, club.reputation + delta);
@@ -107,10 +124,18 @@ export function updateReputation(club, won, config = defaultLeagueConfig) {
 }
 
 /* ============================================================
-   GEBÄUDE-AUSBAU (Stadion/Fanshop/Catering)
+   GEBÄUDE-AUSBAU (alle sieben Gebäude aus club.facilities)
    ============================================================ */
 
-const UPGRADABLE_FACILITIES = ['stadium', 'fanshop', 'catering'];
+const UPGRADABLE_FACILITIES = [
+  'stadium', 'fanshop', 'catering',
+  'physicalTraining', 'theoryTraining', 'medical', 'publicRelations'
+];
+
+// Nur Fanshop/Catering dürfen nie über das aktuelle Stadion-Level hinaus
+// ausgebaut werden (Nutzervorgabe) – Trainingscenter/Akademie/Medizinische
+// Abteilung/Öffentlichkeitsarbeit haben keine solche Abhängigkeit.
+const STADIUM_GATED_FACILITIES = ['fanshop', 'catering'];
 
 // Kosten für den nächsten Levelaufstieg, oder null, wenn keine weitere Stufe
 // existiert (config.economy[facilityKey].upgradeCost hat für das aktuelle
@@ -123,14 +148,14 @@ export function facilityUpgradeCost(club, facilityKey, config = defaultLeagueCon
 }
 
 // Prüft, ob ein Gebäude gerade ausgebaut werden könnte (Grundlage für den
-// Button-Zustand auf stadium.html): Obergrenze noch nicht erreicht, bei
-// Fanshop/Catering zusätzlich nie über das aktuelle Stadion-Level hinaus
-// (Nutzervorgabe), und genug Geld in der Kasse.
+// Button-Zustand in den jeweiligen Gebäude-Seiten): Obergrenze noch nicht
+// erreicht, bei Fanshop/Catering zusätzlich nie über das aktuelle
+// Stadion-Level hinaus, und genug Geld in der Kasse.
 export function canUpgradeFacility(club, facilityKey, config = defaultLeagueConfig) {
   const cfg = config.economy[facilityKey];
   const currentLevel = club.facilities[facilityKey].level;
   if (currentLevel >= cfg.maxLevel) return false;
-  if (facilityKey !== 'stadium' && currentLevel >= club.facilities.stadium.level) return false;
+  if (STADIUM_GATED_FACILITIES.includes(facilityKey) && currentLevel >= club.facilities.stadium.level) return false;
 
   const cost = facilityUpgradeCost(club, facilityKey, config);
   return cost != null && club.money >= cost;
@@ -152,18 +177,85 @@ export function upgradeFacility(club, facilityKey, config = defaultLeagueConfig)
   return club.facilities[facilityKey].level;
 }
 
-// Laufender Unterhalt pro Match für Stadion/Fanshop/Catering (Level 1 ist
-// bei allen dreien unterhaltsfrei). Wird von processPostMatch nach den
-// Gehältern abgezogen. Gibt die Einzelposten zurück, analog zu
-// payMatchIncome, damit der Post-Match-Bildschirm sie einzeln zeigen kann.
+// Reine Berechnung des laufenden Unterhalts pro Match für alle sieben
+// Gebäude (Level 1 ist bei jedem unterhaltsfrei) – keine Mutation, damit
+// sowohl deductFacilityUpkeep (mutierend) als auch previewNextMatchEconomy
+// (reine Vorschau, finances.html) dieselbe Formel nutzen können.
+function calculateFacilityUpkeep(club, config) {
+  const upkeepFor = (key) => config.economy[key].upkeepByLevel[club.facilities[key].level] ?? 0;
+
+  const stadium = upkeepFor('stadium');
+  const fanshop = upkeepFor('fanshop');
+  const catering = upkeepFor('catering');
+  const physicalTraining = upkeepFor('physicalTraining');
+  const theoryTraining = upkeepFor('theoryTraining');
+  const medical = upkeepFor('medical');
+  const publicRelations = upkeepFor('publicRelations');
+
+  const total = stadium + fanshop + catering + physicalTraining + theoryTraining + medical + publicRelations;
+  return { stadium, fanshop, catering, physicalTraining, theoryTraining, medical, publicRelations, total };
+}
+
+// Zieht den laufenden Unterhalt tatsächlich von der Vereinskasse ab. Wird von
+// processPostMatch nach den Gehältern abgezogen. Gibt die Einzelposten
+// zurück, analog zu payMatchIncome, damit der Post-Match-Bildschirm sie
+// einzeln zeigen kann.
 export function deductFacilityUpkeep(club, config = defaultLeagueConfig) {
-  const stadium = config.economy.stadium.upkeepByLevel[club.facilities.stadium.level] ?? 0;
-  const fanshop = config.economy.fanshop.upkeepByLevel[club.facilities.fanshop.level] ?? 0;
-  const catering = config.economy.catering.upkeepByLevel[club.facilities.catering.level] ?? 0;
-
-  const total = stadium + fanshop + catering;
-  club.money -= total;
+  const upkeep = calculateFacilityUpkeep(club, config);
+  club.money -= upkeep.total;
   saveClub(club);
+  return upkeep;
+}
 
-  return { stadium, fanshop, catering, total };
+// Reine Vorschau-Berechnung für den kommenden Spieltag (keine Mutation, kein
+// saveClub) – Grundlage für finances.html. Nutzt die aktuelle Matchday-
+// Nominierung als Annahme, wer "Feld"/"Bank" sein wird (echte Einwechslungen
+// während des künftigen Matches sind naturgemäß nicht im Voraus bekannt).
+// Würfelabhängige Posten (aktuell nur die Zuschauereinnahme, und davon
+// abgeleitet Catering) werden als statistischer Durchschnitt angegeben
+// (Mittelwert des Würfels), nicht als konkreter Wurf – daher `diceSides` und
+// `attendanceIsAverage: true` im Rückgabewert, damit die UI das klar
+// kennzeichnen kann. Die Siegprämie ist ergebnisabhängig und wird deshalb
+// separat ausgewiesen statt in eine Summe eingerechnet.
+export function previewNextMatchEconomy(club, players, config = defaultLeagueConfig) {
+  const rates = config.economy.salaryRates;
+  let salaryTotal = 0;
+  let sponsorSkillIncome = 0;
+  for (const p of players) {
+    const rate = club.lastMatchNomination.starters.includes(p.playerId)
+      ? rates.feld
+      : club.lastMatchNomination.bench.includes(p.playerId)
+        ? rates.bank
+        : rates.frei;
+    const amount = Math.round(p.marketValue * rate);
+    if (p.skills.includes('Sponsor')) sponsorSkillIncome += amount;
+    else salaryTotal += amount;
+  }
+
+  const attendanceCfg = config.economy.attendance;
+  const stadiumLevel = club.facilities.stadium.level;
+  const diceSides = attendanceCfg.diceSidesByStadiumLevel[stadiumLevel] ?? attendanceCfg.diceSidesByStadiumLevel[1];
+  const avgRoll = (diceSides + 1) / 2;
+  const attendance = Math.round(club.reputation * attendanceCfg.reputationFactor * avgRoll);
+
+  const fanshop = calculateFanshopIncome(club, config);
+  const catering = calculateCateringIncome(club, attendance, config);
+  const sponsor = config.economy.sponsorIncome;
+  const winBonus = config.economy.winPrize;
+
+  const facilityUpkeep = calculateFacilityUpkeep(club, config);
+
+  const guaranteedIncome = attendance + fanshop + catering + sponsor + sponsorSkillIncome;
+  const netWithoutWin = guaranteedIncome - salaryTotal - facilityUpkeep.total;
+
+  return {
+    salaryTotal,
+    sponsorSkillIncome,
+    income: { attendance, fanshop, catering, sponsor, winBonus },
+    facilityUpkeep,
+    diceSides,
+    attendanceIsAverage: true,
+    netWithoutWin,
+    netWithWin: netWithoutWin + winBonus
+  };
 }

@@ -36,12 +36,14 @@ export function purchaseSkill(player, club, skill, config = defaultLeagueConfig)
     throw new Error(`${player.name} hat ${skill} bereits oder wartet schon darauf`);
   }
 
+  // Startskills der Position zählen nicht gegen das Limit (Formel 3.4) – nur
+  // zusätzlich erworbene. Dieselbe Zahl wird unten auch für die
+  // Preis-Eskalation gebraucht, deshalb nur einmal berechnet.
   const alreadyPurchasedAdditional = (player.skills.length - base.skills.length) + player.bankedSkillPurchases.length;
 
   const limit = skillLimit(player, club, config);
-  const totalSkills = player.skills.length + player.bankedSkillPurchases.length;
-  if (totalSkills >= limit) {
-    throw new Error(`Skill-Limit erreicht (${limit})`);
+  if (alreadyPurchasedAdditional >= limit) {
+    throw new Error(`Skill-Limit erreicht (${limit} zusätzliche Skills über die Startskills hinaus)`);
   }
 
   const price = skillPrice(skill, alreadyPurchasedAdditional + 1, config);

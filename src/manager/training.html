@@ -20,6 +20,8 @@
 
 <div id="view" hidden>
   <h2 id="clubName"></h2>
+  <p>Kasse: <span class="money" id="clubMoney"></span> €</p>
+  <div id="facilityUpgrade"></div>
   <p>Physische Trainingsanlage: Level <span id="level"></span> (<span id="slotCount"></span> Slots)</p>
 
   <div id="slots"></div>
@@ -34,6 +36,7 @@
   import { repThreshold, maxAttributeValue } from './formulas.js';
   import { defaultLeagueConfig } from './leagueConfig.js';
   import { renderHeader } from './layout.js';
+  import { renderFacilityUpgradeRow } from './facilityUpgradeUI.js';
 
   renderHeader('training');
 
@@ -125,6 +128,10 @@
 
   function render() {
     el('clubName').textContent = club.name;
+    el('clubMoney').textContent = club.money.toLocaleString('de-DE');
+    el('facilityUpgrade').replaceChildren(
+      renderFacilityUpgradeRow(club, 'physicalTraining', '🏋️', 'Trainingscenter', render)
+    );
     el('level').textContent = club.facilities.physicalTraining.level;
     const slotCount = physicalSlotCount(club, defaultLeagueConfig);
     el('slotCount').textContent = slotCount;

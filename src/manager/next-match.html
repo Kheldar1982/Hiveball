@@ -14,10 +14,17 @@
 <div id="view" hidden>
   <div class="card-grid">
     <div class="card">
+      <h3>Spieltag</h3>
+      <div class="value" id="matchdayLabel">–</div>
+    </div>
+    <div class="card">
       <h3>Nächster Gegner</h3>
-      <div class="value" id="opponentName">Red AI</div>
+      <div class="value" id="opponentName">–</div>
     </div>
   </div>
+  <div class="strength-line" id="opponentStrength"></div>
+
+  <div id="seasonDone" class="season-banner" hidden></div>
 
   <button id="startBtn" class="btn-start">Spiel starten</button>
 
@@ -30,6 +37,7 @@
   import { loadClub, listClubIds, loadPlayers } from './state.js';
   import { getPlayerMatchdayStatus, canSetMatchdayStatus, setPlayerMatchdayStatus } from './nomination.js';
   import { defaultLeagueConfig } from './leagueConfig.js';
+  import { ensureLeague, currentOpponentId, teamName, opponentStars } from './league.js';
   import { renderHeader } from './layout.js';
 
   renderHeader('next-match');
@@ -38,6 +46,7 @@
 
   let club = null;
   let roster = [];
+  let seasonComplete = false;
   let editingSlot = null; // { type: 'feld' | 'bank', index }
 
   function renderSelectionTable(type) {
@@ -119,7 +128,7 @@
   function render() {
     const starterCount = club.lastMatchNomination.starters.length;
     const startBtn = el('startBtn');
-    startBtn.disabled = starterCount !== defaultLeagueConfig.roster.startingLineupSize;
+    startBtn.disabled = seasonComplete || starterCount !== defaultLeagueConfig.roster.startingLineupSize;
 
     renderSlotGroup(el('feldSlots'), 'feld', defaultLeagueConfig.roster.startingLineupSize, 'Feld');
     renderSlotGroup(el('benchSlots'), 'bank', defaultLeagueConfig.roster.maxBench, 'Bank');
@@ -135,6 +144,23 @@
   } else {
     club = loadClub(ids[0]);
     roster = loadPlayers(club.roster);
+
+    const league = ensureLeague(club);
+    seasonComplete = league.seasonComplete;
+    if (seasonComplete) {
+      el('opponentName').textContent = 'Saison beendet';
+      const done = el('seasonDone');
+      done.hidden = false;
+      done.innerHTML = 'Die Saison ist beendet. In der <a href="league.html">Liga</a> kannst du die neue Saison starten.';
+    } else {
+      const oppId = currentOpponentId(club);
+      const s = opponentStars(oppId);
+      el('matchdayLabel').textContent = `${league.currentMatchday + 1} / ${league.schedule.length}`;
+      el('opponentName').textContent = teamName(club, oppId);
+      el('opponentStrength').innerHTML =
+        `Stärke: <span class="stars">${'★'.repeat(s)}${'☆'.repeat(5 - s)}</span>`;
+    }
+
     el('view').hidden = false;
     render();
   }

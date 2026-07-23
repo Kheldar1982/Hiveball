@@ -17,7 +17,7 @@
 // Rückgabe von processPostMatch (Grundlage für den Post-Match-Bildschirm,
 // Phase 1k): { mvpId, players: [{ managerPlayerId, name, isMvp, xpAwarded,
 // repsGained, queuedAttributes, agingOutcome, injuryOutcome }],
-// economy: { moneyBefore, moneyAfter, salaryTotal,
+// economy: { moneyBefore, moneyAfter, salaryTotal, sponsorSkillIncome,
 //   income: { attendance, fanshop, catering, sponsor, winBonus, total },
 //   facilityUpkeep: { stadium, fanshop, catering, total },
 //   reputationBefore, reputationAfter, reputationDelta } }
@@ -131,24 +131,29 @@ export function processPostMatch(club, matchResults, won, config = defaultLeague
   // - matchResults enthält jeden Blau-Spieler, der im Match mitspielte,
   // inklusive Einwechslungen (siehe hiveball.html substituteInjuredPlayers).
   const playedPlayerIds = new Set(matchResults.map((r) => r.managerPlayerId));
-  const salaryTotal = deductSalaries(club, roster, playedPlayerIds, config);
+  const { salaryTotal, sponsorSkillIncome } = deductSalaries(club, roster, playedPlayerIds, config);
   const income = payMatchIncome(club, won, config);
   const facilityUpkeep = deductFacilityUpkeep(club, config);
   const reputationBefore = club.reputation;
   const reputationDelta = updateReputation(club, won, config);
 
-  return {
-    mvpId,
-    players: playerSummaries,
-    economy: {
-      moneyBefore,
-      moneyAfter: club.money,
-      salaryTotal,
-      income,
-      facilityUpkeep,
-      reputationBefore,
-      reputationAfter: club.reputation,
-      reputationDelta
-    }
+  const economy = {
+    moneyBefore,
+    moneyAfter: club.money,
+    salaryTotal,
+    sponsorSkillIncome,
+    income,
+    facilityUpkeep,
+    reputationBefore,
+    reputationAfter: club.reputation,
+    reputationDelta
   };
+
+  // Persistiert für die "Finanzen"-Seite (finances.html) – ohne das wäre
+  // diese Auswertung nach dem Post-Match-Bildschirm unwiederbringlich weg,
+  // da sie bis jetzt nur als Rückgabewert existierte.
+  club.lastMatchEconomy = { ...economy, won, playedAt: Date.now() };
+  saveClub(club);
+
+  return { mvpId, players: playerSummaries, economy };
 }

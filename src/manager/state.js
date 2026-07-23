@@ -116,7 +116,12 @@ export function createClub({ name }) {
     lastMatchNomination: {
       starters: [],
       bench: []
-    }
+    },
+
+    // Wirtschaftliche Zusammenfassung des zuletzt gespielten Matches (siehe
+    // postMatch.js processPostMatch) – Grundlage für finances.html. null,
+    // solange noch kein Match gespielt wurde.
+    lastMatchEconomy: null
   };
 }
 

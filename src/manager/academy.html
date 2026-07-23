@@ -20,6 +20,8 @@
 
 <div id="view" hidden>
   <h2 id="clubName"></h2>
+  <p>Kasse: <span class="money" id="clubMoney"></span> €</p>
+  <div id="facilityUpgrade"></div>
   <p>Akademie: Level <span id="level"></span> (<span id="slotCount"></span> Slots)</p>
 
   <div id="slots"></div>
@@ -33,6 +35,7 @@
   import { trainSkill, theorySlotCount, theorySlotsRemaining } from './skills.js';
   import { defaultLeagueConfig } from './leagueConfig.js';
   import { renderHeader } from './layout.js';
+  import { renderFacilityUpgradeRow } from './facilityUpgradeUI.js';
 
   renderHeader('academy');
 
@@ -115,6 +118,10 @@
 
   function render() {
     el('clubName').textContent = club.name;
+    el('clubMoney').textContent = club.money.toLocaleString('de-DE');
+    el('facilityUpgrade').replaceChildren(
+      renderFacilityUpgradeRow(club, 'theoryTraining', '📚', 'Akademie', render)
+    );
     el('level').textContent = club.facilities.theoryTraining.level;
     const slotCount = theorySlotCount(club, defaultLeagueConfig);
     el('slotCount').textContent = slotCount;

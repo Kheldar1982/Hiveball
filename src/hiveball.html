@@ -175,6 +175,34 @@
   .pg-economy-row { display: flex; justify-content: space-between; font-size: 0.9rem; padding: 2px 0; }
   .pg-economy-total { font-weight: 700; border-top: 1px solid var(--line); margin-top: 4px; padding-top: 4px; }
   #postgame-panel button { margin-top: 16px; }
+
+  /* Manuelle Wechselauswahl (Phase 2) – analog zum Post-Match-Bildschirm */
+  #substitution-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(6, 10, 15, 0.82);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 50;
+  }
+  #substitution-overlay[hidden] { display: none; }
+  #substitution-panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px 24px;
+    max-width: 640px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  #substitution-panel h2 { margin-top: 0; }
+  .sub-slot { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 8px 0; }
+  .sub-slot.sub-filled { border-color: #2f9e44; background: rgba(47, 158, 68, 0.12); }
+  .sub-slot.sub-empty { border-color: #ef4444; background: rgba(239, 68, 68, 0.12); }
+  #sub-continue:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -192,7 +220,7 @@
       <span id="score-blue">0</span>
     </div>
     <div class="score-row">
-      <span class="team-red">Rot (KI)</span>
+      <span class="team-red" id="team-red-name">Rot (KI)</span>
       <span id="score-red">0</span>
     </div>
     <div class="turns-row">
@@ -237,6 +265,18 @@
   </div>
 </div>
 
+<div id="substitution-overlay" hidden>
+  <div id="substitution-panel">
+    <h2>Wechsel: Blau</h2>
+    <p class="pg-hint">
+      Ein oder mehrere Spieler sind ausgeschieden. Wähle Ersatz von der Bank
+      für die offenen Positionen, oder setze mit weniger Spielern fort.
+    </p>
+    <div id="sub-slots"></div>
+    <button id="sub-continue">Fortsetzen</button>
+  </div>
+</div>
+
 <div id="postgame-overlay" hidden>
   <div id="postgame-panel">
     <h2 id="pg-title">Spielende</h2>
@@ -265,6 +305,8 @@
 import { listClubIds, loadClub, loadPlayers } from './manager/state.js';
 import { processPostMatch } from './manager/postMatch.js';
 import { defaultLeagueConfig } from './manager/leagueConfig.js';
+import { ensureLeague, currentOpponentId, recordPlayerLeagueResult } from './manager/league.js';
+import { getOpponentRoster } from './manager/opponents.js';
 
 /* ============================================================
    KONSTANTEN & GRUNDAUFBAU
@@ -284,7 +326,8 @@ let players = [];
 // Spieler, die aktuell nicht auf dem Feld stehen (Bank). Einträge:
 // { team, position, managerPlayer } – managerPlayer ist null für Rot (KI).
 // Werden bei Verletzung/Platzverweis eines Feldspielers am nächsten Kickoff
-// eingewechselt (siehe substituteInjuredPlayers).
+// eingewechselt – Rot automatisch (autoSubstituteTeam), Blau manuell durch
+// den Menschen (siehe startKickoff/showSubstitutionScreen).
 let benchPlayers = [];
 let ball = { x: 0, y: 0, carrierId: null };
 let currentTeam = TEAM_BLUE;
@@ -333,6 +376,26 @@ const SKILLS = {
   Dodge: 'Nutzt beim Geblocktwerden den eigenen AG-Wert statt BL. Gewinnt der ' +
     'Dodge-Spieler, fällt der Angreifer nicht wie sonst üblich – nur eine ' +
     'natürliche 1 des Angreifers lässt diesen trotzdem stürzen.',
+  Zielwurf: '+1 auf den Wurfversuch beim Passen (siehe attemptPass).',
+  'Ruhiger Kopf': 'Ignoriert gegnerische Tacklezonen beim Passen bzw. Fangen ' +
+    '(kein Malus) – gilt für Werfer und Fänger unabhängig voneinander, ' +
+    'siehe attemptPass.',
+  Rückendeckung: 'Unterstützt einen Block auch aus einer zweiten gegnerischen ' +
+    'Tacklezone heraus (normalerweise negiert das die Unterstützung komplett) ' +
+    '– dann aber nur mit +1 statt der halben BL, siehe getBlockAssists.',
+  Ballsicher: '+1 bei der Ballaufnahme vom Boden, siehe tryPickupBall.',
+  Robust: '-1 Schaden (Floor bei 0) beim Verletzungscheck, wenn dieser Spieler ' +
+    'der Verlierer ist – repräsentiert erhöhte Widerstandsfähigkeit (CO), siehe ' +
+    'resolveInjuryCheck.',
+  Gewandt: '+1 auf den Ausweichwurf (AG-Seite) beim Tackle, siehe ' +
+    'attemptLeavingTackleZones.',
+  'Zweite Luft': 'Das erste Extrafeld pro Bewegung kostet keine Stamina (SP), ' +
+    'siehe attemptExtraSquare.',
+  Trittsicher: '+1 auf den Erfolgswurf beim Extrafeld gehen, siehe ' +
+    'attemptExtraSquare.',
+  Hinterhältig: '-1 auf den Entdeckungs-Zielwert beim Foul (leichter unentdeckt ' +
+    'zu bleiben), siehe resolveFoul. Gleicht die allgemeine Anhebung von ' +
+    'ZIELWERT_FOUL (4→5) für spezialisierte Spieler wieder aus.',
 };
 
 // SP zu Spielbeginn = CO * STAMINA_MULTIPLIER. RW (Rüstungswert) kommt komplett
@@ -433,8 +496,18 @@ const EXTRA_SQUARE_SP_COST = 1;
 const EXTRA_SQUARE_TARGET = 10;
 
 // Wie viele Extrafelder sich ein Spieler aktuell noch leisten kann (durch SP begrenzt).
+// "Zweite Luft" macht das erste Extrafeld kostenlos, zählt hier also wie 1 zusätzliches SP.
 function availableExtraSquares(p) {
-  return Math.max(0, Math.min(MAX_EXTRA_SQUARES, p.sp));
+  const freeSquares = hasSkill(p, 'Zweite Luft') ? 1 : 0;
+  return Math.max(0, Math.min(MAX_EXTRA_SQUARES, p.sp + freeSquares));
+}
+
+// Ob das NÄCHSTE Extrafeld (extraSquaresUsedSoFar + 1) noch bezahlbar ist – normalerweise
+// braucht es EXTRA_SQUARE_SP_COST SP, mit "Zweite Luft" ist das allererste Extrafeld einer
+// Bewegung davon ausgenommen (siehe attemptExtraSquare).
+function canAffordExtraSquare(p, extraSquaresUsedSoFar) {
+  if (extraSquaresUsedSoFar === 0 && hasSkill(p, 'Zweite Luft')) return true;
+  return p.sp >= EXTRA_SQUARE_SP_COST;
 }
 
 // Löst ein einzelnes Extrafeld auf: kostet EXTRA_SQUARE_SP_COST SP und erfordert einen
@@ -442,10 +515,17 @@ function availableExtraSquares(p) {
 // weiter. Bei einem Fehlschlag stürzt er an seiner aktuellen Position, verliert zusätzlich
 // SP und der Ball verspringt, falls er ihn trug. Gibt true zurück, wenn der Spieler dabei
 // gestürzt ist (die aufrufende Bewegungsschleife muss dann abbrechen).
+// "Zweite Luft": das erste Extrafeld (stepNumber === 1) kostet keine SP für den reinen
+// Versuch – ein Sturz dabei kostet aber weiterhin die übliche zusätzliche SP (das ist der
+// tatsächliche Fallschaden, keine Erschöpfung). "Trittsicher": +1 auf den Erfolgswurf.
 function attemptExtraSquare(p, stepNumber) {
-  p.sp -= EXTRA_SQUARE_SP_COST;
-  const roll = rollAgainstTarget([{ label: 'AG', value: p.ag }], EXTRA_SQUARE_TARGET);
-  log(`Extrafeld ${stepNumber}/${MAX_EXTRA_SQUARES} (-${EXTRA_SQUARE_SP_COST} SP) – ${teams[p.team].name} #${p.number}: ${roll.desc}`);
+  const isFreeAttempt = stepNumber === 1 && hasSkill(p, 'Zweite Luft');
+  if (!isFreeAttempt) p.sp -= EXTRA_SQUARE_SP_COST;
+
+  const extraSquareAttrs = [{ label: 'AG', value: p.ag }];
+  if (hasSkill(p, 'Trittsicher')) extraSquareAttrs.push({ label: 'Trittsicher', value: 1 });
+  const roll = rollAgainstTarget(extraSquareAttrs, EXTRA_SQUARE_TARGET);
+  log(`Extrafeld ${stepNumber}/${MAX_EXTRA_SQUARES}${isFreeAttempt ? ' (Zweite Luft: kostenlos)' : ` (-${EXTRA_SQUARE_SP_COST} SP)`} – ${teams[p.team].name} #${p.number}: ${roll.desc}`);
   if (!roll.success) {
     p.sp -= EXTRA_SQUARE_SP_COST;
     p.prone = true;
@@ -462,8 +542,12 @@ function attemptExtraSquare(p, stepNumber) {
 
 // Zielwert für den Entdeckungswurf beim Foul (siehe resolveFoul). Bewusst niedrig
 // angesetzt, damit die Entdeckungschance stark vom AG-Wert und vom angerichteten
-// Schaden abhängt statt generell hoch zu sein.
-const ZIELWERT_FOUL = 4;
+// Schaden abhängt statt generell hoch zu sein. Auf 5 angehoben (statt 4), da ein
+// Foul nur einmal pro Zug möglich ist (anders als z.B. Tacklezonen-Situationen,
+// die sehr oft vorkommen) – der Skill "Hinterhältig" (-1) gleicht das für
+// spezialisierte Spieler wieder auf den alten Wert aus, alle anderen haben es
+// jetzt etwas schwerer, unentdeckt zu bleiben.
+const ZIELWERT_FOUL = 5;
 
 /* ============================================================
    SPIEL AUFSETZEN
@@ -550,6 +634,25 @@ function loadBlueRosterFromManager() {
   return { starters, bench };
 }
 
+// Rot (KI): lädt den Gegner des aktuellen Liga-Spieltags (opponents.js) über den
+// Spielplan (league.js). Liefert { name, starters, bench } mit voll bewerteten
+// Spielern – oder null, wenn kein Verein/keine Liga existiert oder die Saison
+// beendet ist; dann greift in setupTeams der feste TEAM_ROSTER-Fallback, damit
+// das Kernspiel eigenständig spielbar bleibt.
+function loadRedRosterFromLeague() {
+  const clubIds = listClubIds();
+  if (clubIds.length === 0) return null;
+
+  const club = loadClub(clubIds[0]);
+  ensureLeague(club);
+  const opponentId = currentOpponentId(club);
+  if (!opponentId) return null;
+
+  const roster = getOpponentRoster(opponentId);
+  if (!roster || roster.starters.length < 5) return null;
+  return roster;
+}
+
 function setupTeams() {
   players = [];
   benchPlayers = [];
@@ -565,34 +668,51 @@ function setupTeams() {
     ys.forEach((y, i) => players.push(createPlayer(id++, i + 1, TEAM_BLUE, TEAM_ROSTER[i], 2, y)));
   }
 
-  // Team Rot rechts, greift nach links an – fest, inkl. 2 Lineman auf der Bank.
-  ys.forEach((y, i) => players.push(createPlayer(id++, i + 1, TEAM_RED, TEAM_ROSTER[i], COLS - 3, y)));
-  RED_BENCH_ROSTER.forEach(position => benchPlayers.push({ team: TEAM_RED, position, managerPlayer: null }));
+  // Team Rot rechts, greift nach links an – der Liga-Gegner des aktuellen
+  // Spieltags (loadRedRosterFromLeague), sonst der feste TEAM_ROSTER-Fallback
+  // inkl. 2 Lineman auf der Bank.
+  const redRoster = loadRedRosterFromLeague();
+  if (redRoster) {
+    ys.forEach((y, i) => players.push(createPlayer(id++, i + 1, TEAM_RED, redRoster.starters[i].position, COLS - 3, y, redRoster.starters[i])));
+    redRoster.bench.forEach(mp => benchPlayers.push({ team: TEAM_RED, position: mp.position, managerPlayer: mp }));
+    teams[TEAM_RED].name = redRoster.name;
+  } else {
+    ys.forEach((y, i) => players.push(createPlayer(id++, i + 1, TEAM_RED, TEAM_ROSTER[i], COLS - 3, y)));
+    RED_BENCH_ROSTER.forEach(position => benchPlayers.push({ team: TEAM_RED, position, managerPlayer: null }));
+  }
+
+  const redNameEl = document.getElementById('team-red-name');
+  if (redNameEl) redNameEl.textContent = `${teams[TEAM_RED].name} (KI)`;
 }
 
-// Ersetzt verwaiste Positionen (Spieler mit injured === true, inkl. Platzverweis)
-// durch einen Bankspieler, priorisiert nach: gleiche Position → Lineman →
-// beliebig verfügbar (Abschnitt 7, Punkt 3). Wird bei jedem Kickoff geprüft
-// (Spielbeginn + nach jedem Touchdown).
-function substituteInjuredPlayers() {
-  [TEAM_BLUE, TEAM_RED].forEach(team => {
-    players.filter(p => p.team === team && p.injured && !p.substituted).forEach(injuredPlayer => {
-      const replacement = pickBenchReplacement(team, injuredPlayer.position);
-      if (!replacement) return;
+// Führt eine einzelne Einwechslung tatsächlich durch (Spielerobjekt anlegen,
+// auf die Position/Startfeld des Ausgeschiedenen setzen, Bank verlassen).
+// Gemeinsam genutzt von der automatischen Rot-Ersetzung und der manuellen
+// Blau-Auswahl (siehe unten), damit beide exakt dieselbe Mechanik verwenden.
+function performSubstitution(injuredPlayer, replacement) {
+  injuredPlayer.substituted = true;
+  benchPlayers = benchPlayers.filter(b => b !== replacement);
 
-      injuredPlayer.substituted = true;
-      benchPlayers = benchPlayers.filter(b => b !== replacement);
+  const newId = Math.max(0, ...players.map(p => p.id)) + 1;
+  const substitute = createPlayer(
+    newId, injuredPlayer.number, injuredPlayer.team, replacement.position,
+    injuredPlayer.startX, injuredPlayer.startY, replacement.managerPlayer
+  );
+  players.push(substitute);
 
-      const newId = Math.max(0, ...players.map(p => p.id)) + 1;
-      const substitute = createPlayer(
-        newId, injuredPlayer.number, team, replacement.position,
-        injuredPlayer.startX, injuredPlayer.startY, replacement.managerPlayer
-      );
-      players.push(substitute);
+  const name = replacement.managerPlayer ? replacement.managerPlayer.name : replacement.position;
+  log(`🔄 ${teams[injuredPlayer.team].name} #${injuredPlayer.number} wird ersetzt: ${name} kommt von der Bank.`);
+}
 
-      const name = replacement.managerPlayer ? replacement.managerPlayer.name : replacement.position;
-      log(`🔄 ${teams[team].name} #${injuredPlayer.number} wird ersetzt: ${name} kommt von der Bank.`);
-    });
+// Ersetzt verwaiste Positionen automatisch, priorisiert nach: gleiche
+// Position → Lineman → beliebig verfügbar. Nur noch für Rot (KI) genutzt –
+// Rot trifft keine eigene Entscheidung, Blau bekommt stattdessen die manuelle
+// Auswahl unten (Phase 2: "manuelle Wechselauswahl statt automatischer
+// Priorität").
+function autoSubstituteTeam(team) {
+  players.filter(p => p.team === team && p.injured && !p.substituted).forEach(injuredPlayer => {
+    const replacement = pickBenchReplacement(team, injuredPlayer.position);
+    if (replacement) performSubstitution(injuredPlayer, replacement);
   });
 }
 
@@ -604,20 +724,127 @@ function pickBenchReplacement(team, injuredPosition) {
     || null;
 }
 
+// Die 5 Feld-Positionen (Trikotnummern 1–5) für Blau: entweder aktuell aktiv
+// besetzt, oder eine offene Vakanz (verletzt, noch nicht ersetzt) – Grundlage
+// für den manuellen Wechselbildschirm, analog zu next-match.html.
+function getBlueFieldSlots() {
+  return [1, 2, 3, 4, 5].map(number => {
+    const active = players.find(p => p.team === TEAM_BLUE && p.number === number && !p.injured);
+    const vacancy = active ? null : players.find(p => p.team === TEAM_BLUE && p.number === number && p.injured && !p.substituted);
+    return { number, active, vacancy };
+  });
+}
+
+// Manuelle Wechselauswahl für Blau (Phase 2): zeigt alle 5 Feld-Positionen,
+// offene Vakanzen bekommen eine Auswahltabelle mit der aktuellen Bank.
+// "Fortsetzen" wird erst klickbar, wenn entweder keine Vakanz mehr offen ist
+// oder die Bank komplett leer ist – im schlimmsten Fall spielt Blau dann mit
+// weniger als 5 Feldspielern weiter (bewusste Nutzervorgabe).
+function renderSubstitutionScreen(onContinue) {
+  const container = document.getElementById('sub-slots');
+  container.innerHTML = '';
+  const slots = getBlueFieldSlots();
+
+  slots.forEach(slot => {
+    const box = document.createElement('div');
+    box.className = 'sub-slot ' + (slot.vacancy ? 'sub-empty' : 'sub-filled');
+
+    if (slot.active) {
+      const name = slot.active.managerPlayer ? slot.active.managerPlayer.name : slot.active.position;
+      box.appendChild(document.createTextNode(`#${slot.number}: ${name} (${slot.active.position})`));
+    } else {
+      box.appendChild(document.createTextNode(`#${slot.number}: ausgeschieden`));
+      const candidates = benchPlayers.filter(b => b.team === TEAM_BLUE);
+      if (candidates.length === 0) {
+        const hint = document.createElement('div');
+        hint.className = 'pg-hint';
+        hint.textContent = 'Keine Bankspieler mehr verfügbar – Position bleibt unbesetzt.';
+        box.appendChild(hint);
+      } else {
+        const table = document.createElement('table');
+        table.className = 'pg-table';
+        table.innerHTML = '<thead><tr><th>Spieler</th><th>Position</th><th></th></tr></thead>';
+        const tbody = document.createElement('tbody');
+        candidates.forEach(candidate => {
+          const tr = document.createElement('tr');
+          const td = (text) => { const c = document.createElement('td'); c.textContent = text; return c; };
+          tr.appendChild(td(candidate.managerPlayer ? candidate.managerPlayer.name : candidate.position));
+          tr.appendChild(td(candidate.position));
+          const actionTd = document.createElement('td');
+          const btn = document.createElement('button');
+          btn.textContent = 'Einwechseln';
+          btn.addEventListener('click', () => {
+            performSubstitution(slot.vacancy, candidate);
+            renderSubstitutionScreen(onContinue);
+          });
+          actionTd.appendChild(btn);
+          tr.appendChild(actionTd);
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        box.appendChild(table);
+      }
+    }
+    container.appendChild(box);
+  });
+
+  const stillVacant = slots.some(s => s.vacancy);
+  const benchLeft = benchPlayers.some(b => b.team === TEAM_BLUE);
+  const continueBtn = document.getElementById('sub-continue');
+  continueBtn.disabled = stillVacant && benchLeft;
+  continueBtn.onclick = () => {
+    // Verbleibende Vakanzen als behandelt markieren (kein erneutes Aufpoppen
+    // bei künftigen Kickoffs) – Blau spielt dort bewusst in Unterzahl weiter.
+    slots.forEach(s => { if (s.vacancy) s.vacancy.substituted = true; });
+    document.getElementById('substitution-overlay').hidden = true;
+    onContinue();
+  };
+}
+
+function showSubstitutionScreen(onContinue) {
+  renderSubstitutionScreen(onContinue);
+  document.getElementById('substitution-overlay').hidden = false;
+}
+
 function resetBallToCenter() {
   ball.x = Math.floor(COLS / 2);
   ball.y = Math.floor(ROWS / 2);
   ball.carrierId = null;
 }
 
-function startKickoff() {
-  substituteInjuredPlayers();
+function finishKickoff() {
   players.forEach(p => {
     p.x = p.startX; p.y = p.startY;
     p.prone = false; p.acted = false;
     p.movesLeft = p.mr;
   });
   resetBallToCenter();
+  draw();
+}
+
+// Wird bei Spielbeginn und nach jedem Touchdown aufgerufen. Rot (KI) wird
+// sofort automatisch ersetzt; Blau bekommt bei einer offenen Vakanz mit
+// verfügbarer Bank die manuelle Auswahl (siehe oben) und der Kickoff
+// pausiert, bis der Mensch "Fortsetzen" klickt. `afterKickoff` läuft erst,
+// wenn der Kickoff (inkl. möglicher Wechselauswahl) wirklich abgeschlossen
+// ist – wichtig für den Aufrufer aus checkScore(), der darüber endTurn()
+// erst zu diesem Zeitpunkt anstößt (siehe Kommentar dort).
+function startKickoff(afterKickoff = () => {}) {
+  autoSubstituteTeam(TEAM_RED);
+
+  const blueVacancy = players.some(p => p.team === TEAM_BLUE && p.injured && !p.substituted);
+  if (blueVacancy) {
+    // Zeigt das Wechselfenster auch, wenn die Bank bereits leer ist (dann
+    // ist "Fortsetzen" sofort klickbar) – der Mensch soll die Unterzahl
+    // bewusst bestätigen, statt dass sie stillschweigend passiert.
+    showSubstitutionScreen(() => {
+      finishKickoff();
+      afterKickoff();
+    });
+  } else {
+    finishKickoff();
+    afterKickoff();
+  }
 }
 
 /* ============================================================
@@ -646,29 +873,38 @@ function isAdjacent(a, b) {
 
 // Ermittelt, welche Teamkameraden von 'supporter' dessen Wurf gegen 'target' unterstützen
 // (z.B. beim Block: supporter = Blocker, target = Geblockter, oder umgekehrt).
-// Ein Teamkamerad unterstützt, wenn er selbst in der Tacklezone von 'target' steht,
-// ABER kein anderer Spieler aus dem Team von 'target' (außer target selbst) ihn seinerseits
-// in dessen eigener Tacklezone hat – eine fremde Tacklezone (außer die von target) negiert
-// die Unterstützung.
+// Ein Teamkamerad unterstützt normal (halber BL-Wert, abgerundet), wenn er selbst in der
+// Tacklezone von 'target' steht, ABER kein anderer Spieler aus dem Team von 'target'
+// (außer target selbst) ihn seinerseits in dessen eigener Tacklezone hat – eine fremde
+// Tacklezone (außer die von target) negiert normalerweise die Unterstützung komplett.
+// Mit dem Skill "Rückendeckung" unterstützt ein Spieler auch aus einer solchen zweiten
+// gegnerischen Tacklezone heraus, dann aber nur mit einem festen +1 statt der halben BL.
+// Gibt { player, bonus }-Objekte zurück statt roher Spielerobjekte, damit der bereits
+// passend berechnete Bonus (unterschiedlich je nach Rückendeckung-Fall) nicht an jeder
+// Aufrufstelle erneut hergeleitet werden muss.
 function getBlockAssists(supporter, target) {
-  return players.filter(p =>
-    p.team === supporter.team &&
-    p.id !== supporter.id &&
-    !p.prone && !p.injured &&
-    chebyshev(p.x, p.y, target.x, target.y) === 1 &&
-    !players.some(o =>
-      o.team === target.team &&
-      o.id !== target.id &&
-      !o.prone && !o.injured &&
-      chebyshev(o.x, o.y, p.x, p.y) === 1
+  return players
+    .filter(p =>
+      p.team === supporter.team &&
+      p.id !== supporter.id &&
+      !p.prone && !p.injured &&
+      chebyshev(p.x, p.y, target.x, target.y) === 1
     )
-  );
+    .map(p => {
+      const inSecondEnemyZone = players.some(o =>
+        o.team === target.team &&
+        o.id !== target.id &&
+        !o.prone && !o.injured &&
+        chebyshev(o.x, o.y, p.x, p.y) === 1
+      );
+      return { player: p, inSecondEnemyZone, bonus: inSecondEnemyZone ? 1 : Math.floor(p.bl / 2) };
+    })
+    .filter(a => !a.inSecondEnemyZone || hasSkill(a.player, 'Rückendeckung'));
 }
 
-// Wandelt eine Liste unterstützender Spieler in Wurf-Teile um: jeder Unterstützer trägt
-// die Hälfte seines BL-Werts (abgerundet) zum Wurf bei.
+// Wandelt eine Liste unterstützender { player, bonus }-Einträge in Wurf-Teile um.
 function assistParts(assists) {
-  return assists.map(p => ({ label: `Unterstützung #${p.number}`, value: Math.floor(p.bl / 2) }));
+  return assists.map(a => ({ label: `Unterstützung #${a.player.number}`, value: a.bonus }));
 }
 
 // Sucht den besten Bewegungspfad von (x1,y1) nach (x2,y2) über das Raster (8 Richtungen).
@@ -816,12 +1052,15 @@ function creditMatchRep(player, attr) {
 function resolveInjuryCheck(winner, loser) {
   const raw = rollD10();
   const total = raw + winner.st;
-  const damage = Math.max(0, total - loser.rw);
+  const rawDamage = Math.max(0, total - loser.rw);
+  // Robust: -1 Schaden (Floor bei 0) für den Verlierer, repräsentiert erhöhte
+  // Widerstandsfähigkeit (CO) – siehe SKILLS-Kommentar oben.
+  const damage = hasSkill(loser, 'Robust') ? Math.max(0, rawDamage - 1) : rawDamage;
   const spBefore = loser.sp;
   loser.sp -= damage;
   const injured = loser.sp <= 0;
   const desc = `W10: ${raw} + ST ${winner.st} = ${total}  vs RW ${loser.rw}  →  ` +
-    `${damage} Schaden auf SP (${spBefore} → ${loser.sp})`;
+    `${rawDamage} Schaden${damage !== rawDamage ? ` (Robust: -1 → ${damage})` : ''} auf SP (${spBefore} → ${loser.sp})`;
 
   // Reps (Phase 1j, Nutzer-Vorgabe): ST trainiert bei jedem Verletzungscheck-Gewinn,
   // unabhängig vom Ergebnis. CO trainiert beim Verlierer, wenn der RW den Wurf
@@ -1034,8 +1273,10 @@ function tryPickupBall(player) {
   if (player.x !== ball.x || player.y !== ball.y) return true; // steht nicht auf dem Ball
 
   const tz = countEnemyTackleZones(player.x, player.y, player.team);
+  const pickupAttrs = [{ label: 'AG', value: player.ag }];
+  if (hasSkill(player, 'Ballsicher')) pickupAttrs.push({ label: 'Ballsicher', value: 1 });
   const r = rollAgainstTarget(
-    [{ label: 'AG', value: player.ag }],
+    pickupAttrs,
     8,
     tz > 0 ? [{ label: 'Tacklezone(n)', value: tz }] : []
   );
@@ -1078,7 +1319,14 @@ function checkScore(player) {
     if (teams[player.team].score >= WIN_SCORE) {
       endGame(`${teams[player.team].name} gewinnt mit ${WIN_SCORE} Touchdowns!`);
     } else {
-      startKickoff();
+      // endTurn() darf erst laufen, wenn der Kickoff (inkl. möglicher
+      // manueller Wechselauswahl für Blau) wirklich abgeschlossen ist – sonst
+      // würde bei offener Vakanz bereits jetzt auf das nächste Team
+      // umgeschaltet und ggf. sofort aiTurn() per setTimeout eingeplant,
+      // während der Mensch noch im Wechselfenster ist und die Spielerpositionen
+      // noch gar nicht zurückgesetzt sind (Bug: KI "spielt" unsichtbar mit
+      // veraltetem Zustand, Zugwechsel wirkt danach vertauscht).
+      startKickoff(() => endTurn(true));
     }
     return true;
   }
@@ -1142,6 +1390,18 @@ function processManagerPostMatch() {
     repsGained: { ...p.matchRepsGained }
   }));
   const summary = processPostMatch(club, matchResults, won);
+
+  // Liga-Verbuchung (Slice B): das echte Ergebnis dieses Spieltags eintragen,
+  // die übrigen zwei Begegnungen abstrakt simulieren und den Spieltag
+  // weiterschalten. playerInj = von Blau zugefügte Verletzungen (injuriesCaused),
+  // oppInj = erlittene (Anzahl in diesem Match ausgeschiedener Blau-Spieler).
+  recordPlayerLeagueResult(club, {
+    playerTd: teams[TEAM_BLUE].score,
+    oppTd: teams[TEAM_RED].score,
+    playerInj: matchResults.reduce((s, r) => s + (r.injuriesCaused || 0), 0),
+    oppInj: matchResults.filter(r => r.wasInjured).length,
+  });
+
   return { club, won, summary };
 }
 
@@ -1275,6 +1535,9 @@ function showPostgameScreen(message, managerResult) {
     if (income.catering > 0) {
       economyContainer.appendChild(row('Einnahmen: Catering', `+${EUR(income.catering)}`));
     }
+    if (summary.economy.sponsorSkillIncome > 0) {
+      economyContainer.appendChild(row('Einnahmen: Spieler-Sponsoren (Skill)', `+${EUR(summary.economy.sponsorSkillIncome)}`));
+    }
     economyContainer.appendChild(row('Ausgaben: Gehälter', `-${EUR(summary.economy.salaryTotal)}`));
     if (summary.economy.facilityUpkeep.total > 0) {
       economyContainer.appendChild(row('Ausgaben: Gebäude-Unterhalt', `-${EUR(summary.economy.facilityUpkeep.total)}`));
@@ -1348,11 +1611,14 @@ function attemptLeavingTackleZones(dodger, destX, destY) {
     const staysInZone = chebyshev(tackler.x, tackler.y, destX, destY) === 1;
     const bonus = staysInZone ? 1 : 0;
 
+    const dodgerParts = [{ label: 'AG', value: dodger.ag }];
+    if (hasSkill(dodger, 'Gewandt')) dodgerParts.push({ label: 'Gewandt', value: 1 });
+
     const r = rollOpposed(
       bonus > 0
         ? [{ label: 'BL', value: tackler.bl }, { label: 'Zonenbonus', value: bonus }]
         : [{ label: 'BL', value: tackler.bl }],
-      [{ label: 'AG', value: dodger.ag }]
+      dodgerParts
     );
     log(`Tackle – ${teams[tackler.team].name} #${tackler.number}: ${r.descA}  vs  ${teams[dodger.team].name} #${dodger.number}: ${r.descB}${r.note}`);
 
@@ -1410,7 +1676,9 @@ function attemptLeavingTackleZones(dodger, destX, destY) {
 // den ganzen Zug beendet hat (Touchdown oder Turnover), sonst true.
 function finishArrival(player) {
   if (checkScore(player)) {
-    endTurn(true);
+    // endTurn() passiert jetzt innerhalb von checkScore()/startKickoff(),
+    // erst nachdem der Kickoff (inkl. möglicher Wechselauswahl) abgeschlossen
+    // ist – siehe Kommentar dort.
     return false;
   }
   const ok = tryPickupBall(player);
@@ -1437,7 +1705,7 @@ function movePlayer(player, x, y) {
     const usingExtraSquare = player.movesLeft <= 0;
 
     // Weder reguläre Bewegungspunkte noch (weitere) Extrafelder verfügbar -> Bewegung endet hier
-    if (usingExtraSquare && (extraSquaresUsed >= MAX_EXTRA_SQUARES || player.sp < EXTRA_SQUARE_SP_COST)) {
+    if (usingExtraSquare && (extraSquaresUsed >= MAX_EXTRA_SQUARES || !canAffordExtraSquare(player, extraSquaresUsed))) {
       break;
     }
 
@@ -1509,9 +1777,12 @@ function attemptPass(passer, target) {
 
   logAction(`Pass: ${teams[passer.team].name} #${passer.number} → #${target.number}`, '🎯', passer.team);
   const baseTarget = Math.ceil(5 + fields); // Zielwert: 5 + zurückgelegte Distanz, aufgerundet
-  const tzPasser = countEnemyTackleZones(passer.x, passer.y, passer.team);
+  // Ruhiger Kopf: ignoriert gegnerische Tacklezonen beim Passen (kein Malus).
+  const tzPasser = hasSkill(passer, 'Ruhiger Kopf') ? 0 : countEnemyTackleZones(passer.x, passer.y, passer.team);
+  const passerAttrs = [{ label: 'PA', value: passer.pa }];
+  if (hasSkill(passer, 'Zielwurf')) passerAttrs.push({ label: 'Zielwurf', value: 1 });
   const r = rollAgainstTarget(
-    [{ label: 'PA', value: passer.pa }],
+    passerAttrs,
     baseTarget,
     tzPasser > 0 ? [{ label: 'Tacklezone(n)', value: tzPasser }] : []
   );
@@ -1534,7 +1805,8 @@ function attemptPass(passer, target) {
   creditMatchRep(passer, 'pa');
 
   // Wurf war gut genug, jetzt versucht der Zielspieler zu fangen
-  const tzCatcher = countEnemyTackleZones(target.x, target.y, target.team);
+  // Ruhiger Kopf: ignoriert gegnerische Tacklezonen beim Fangen (kein Malus).
+  const tzCatcher = hasSkill(target, 'Ruhiger Kopf') ? 0 : countEnemyTackleZones(target.x, target.y, target.team);
   const catchResult = rollAgainstTarget(
     [{ label: 'AG', value: target.ag }],
     8,
@@ -1631,11 +1903,11 @@ function resolveBlock(attacker, defender) {
   const defenderAssists = getBlockAssists(defender, attacker);
   if (attackerAssists.length) {
     log(`Unterstützung für ${teams[attacker.team].name} #${attacker.number}: ` +
-      attackerAssists.map(p => `#${p.number} (+${Math.floor(p.bl / 2)})`).join(', '));
+      attackerAssists.map(a => `#${a.player.number} (+${a.bonus})`).join(', '));
   }
   if (defenderAssists.length) {
     log(`Unterstützung für ${teams[defender.team].name} #${defender.number}: ` +
-      defenderAssists.map(p => `#${p.number} (+${Math.floor(p.bl / 2)})`).join(', '));
+      defenderAssists.map(a => `#${a.player.number} (+${a.bonus})`).join(', '));
   }
 
   // 1) BL-Duell entscheidet, wer umfällt (inkl. Unterstützungsboni, Bewegungsabzug,
@@ -1735,12 +2007,14 @@ function resolveBlock(attacker, defender) {
 function evaluateFoulOutcome(attacker, victim) {
   let damageSum = 0;
   let caughtCount = 0;
+  const hinterhaeltigBonus = hasSkill(attacker, 'Hinterhältig') ? 1 : 0;
 
   for (let injuryRaw = 1; injuryRaw <= 10; injuryRaw++) {
-    const damage = Math.max(0, injuryRaw + attacker.st - victim.rw);
+    const rawDamage = Math.max(0, injuryRaw + attacker.st - victim.rw);
+    const damage = hasSkill(victim, 'Robust') ? Math.max(0, rawDamage - 1) : rawDamage;
     damageSum += damage;
 
-    const discoveryTarget = ZIELWERT_FOUL + Math.floor(damage / 2);
+    const discoveryTarget = ZIELWERT_FOUL + Math.floor(damage / 2) - hinterhaeltigBonus;
     for (let discoveryRaw = 1; discoveryRaw <= 10; discoveryRaw++) {
       let success;
       if (discoveryRaw === 10) success = true;
@@ -1782,11 +2056,13 @@ function resolveFoul(attacker, victim) {
   // 2) Entdeckungswurf: AG des Foulenden (Heimlichkeit) gegen ZIELWERT_FOUL, erschwert um
   // die Hälfte des soeben angerichteten Schadens (Brutalität). Krit-10/Krit-1 gelten hier
   // ganz normal (bereits in rollAgainstTarget eingebaut). Design-Begründung für diesen
-  // Trade-off zwischen Positionen: siehe README.
+  // Trade-off zwischen Positionen: siehe README. Hinterhältig senkt das Ziel um 1.
+  const discoveryMods = [{ label: 'Schadensfolge', value: Math.floor(injuryResult.damage / 2) }];
+  if (hasSkill(attacker, 'Hinterhältig')) discoveryMods.push({ label: 'Hinterhältig', value: -1 });
   const discoveryResult = rollAgainstTarget(
     [{ label: 'AG', value: attacker.ag }],
     ZIELWERT_FOUL,
-    [{ label: 'Schadensfolge', value: Math.floor(injuryResult.damage / 2) }]
+    discoveryMods
   );
   log(`Entdeckungswurf – ${teams[attacker.team].name} #${attacker.number}: ${discoveryResult.desc}`);
 
@@ -1946,8 +2222,8 @@ function findBestBlockOption(p) {
   adjEnemies.forEach(e => {
     // Unterstützungsboni mit einrechnen, sonst würde die KI Blocks falsch einschätzen,
     // sobald Teamkameraden mit unterstützen (siehe getBlockAssists/resolveBlock).
-    const bonusP = getBlockAssists(p, e).reduce((s, a) => s + Math.floor(a.bl / 2), 0);
-    const bonusE = getBlockAssists(e, p).reduce((s, a) => s + Math.floor(a.bl / 2), 0);
+    const bonusP = getBlockAssists(p, e).reduce((s, a) => s + a.bonus, 0);
+    const bonusE = getBlockAssists(e, p).reduce((s, a) => s + a.bonus, 0);
     const eBaseAttr = hasSkill(e, 'Dodge') ? e.ag : e.bl;
     const blockChance = opposedChance(
       p.bl + bonusP - movementBlockPenalty(p) + (hasSkill(p, 'Block') ? 1 : 0),
@@ -2037,7 +2313,7 @@ function aiAdvanceCarefully(p, destX, destY) {
 
   for (const step of path) {
     const usingExtraSquare = p.movesLeft <= 0;
-    if (usingExtraSquare && (extraSquaresUsed >= extraBudget || p.sp < EXTRA_SQUARE_SP_COST)) break;
+    if (usingExtraSquare && (extraSquaresUsed >= extraBudget || !canAffordExtraSquare(p, extraSquaresUsed))) break;
 
     const risk = findRiskiestTackle(p, step.x, step.y);
     if (risk) {
@@ -2237,8 +2513,8 @@ function previewMovePreview(dodger, destX, destY) {
 function previewBlockPreview(attacker, defender) {
   const attackerAssists = getBlockAssists(attacker, defender);
   const defenderAssists = getBlockAssists(defender, attacker);
-  const bonusA = attackerAssists.reduce((s, p) => s + Math.floor(p.bl / 2), 0);
-  const bonusB = defenderAssists.reduce((s, p) => s + Math.floor(p.bl / 2), 0);
+  const bonusA = attackerAssists.reduce((s, a) => s + a.bonus, 0);
+  const bonusB = defenderAssists.reduce((s, a) => s + a.bonus, 0);
   const movePenalty = movementBlockPenalty(attacker);
   const attackerHasBlockSkill = hasSkill(attacker, 'Block');
   const defenderHasBlockSkill = hasSkill(defender, 'Block');
@@ -2258,10 +2534,10 @@ function previewBlockPreview(attacker, defender) {
     `${defenderHasBlockSkill ? ' + 1 Block-Skill' : ''} = ${totalB}  ` +
     `(Differenz ${diff >= 0 ? '+' : ''}${diff})<br>`;
   if (attackerAssists.length) {
-    html += `Unterstützer #${attacker.number}: ${attackerAssists.map(p => '#' + p.number + ' (+' + Math.floor(p.bl / 2) + ')').join(', ')}<br>`;
+    html += `Unterstützer #${attacker.number}: ${attackerAssists.map(a => '#' + a.player.number + ' (+' + a.bonus + ')').join(', ')}<br>`;
   }
   if (defenderAssists.length) {
-    html += `Unterstützer #${defender.number}: ${defenderAssists.map(p => '#' + p.number + ' (+' + Math.floor(p.bl / 2) + ')').join(', ')}<br>`;
+    html += `Unterstützer #${defender.number}: ${defenderAssists.map(a => '#' + a.player.number + ' (+' + a.bonus + ')').join(', ')}<br>`;
   }
   if (attacker.mr !== attacker.movesLeft && hasSkill(attacker, 'Blitz')) {
     html += `#${attacker.number} hat Blitz: kein Bewegungsabzug trotz genutzter MR.<br>`;
@@ -2282,20 +2558,24 @@ function previewBlockPreview(attacker, defender) {
 function previewFoulPreview(attacker, victim) {
   // Verletzungscheck ist kein Opposed-Wurf (siehe resolveInjuryCheck): "verletzt" bedeutet
   // W10 + ST - RW >= aktuelle SP des Opfers, umgestellt also W10 >= SP + RW - ST.
-  const injuryTarget = victim.sp + victim.rw;
+  // Robust beim Opfer verschiebt das effektiv um +1 (siehe resolveInjuryCheck: -1 Schaden).
+  const victimHasRobust = hasSkill(victim, 'Robust');
+  const injuryTarget = victim.sp + victim.rw + (victimHasRobust ? 1 : 0);
   const injuryRoll = neededRoll(injuryTarget, attacker.st);
 
   // Der Entdeckungswurf hängt vom tatsächlich angerichteten Schaden ab, der erst nach dem
   // Verletzungswurf feststeht – zeige daher die Bandbreite zwischen keinem und maximalem
   // Schaden (W10 = 10 beim Verletzungscheck).
-  const maxDamage = Math.max(0, (10 + attacker.st) - victim.rw);
-  const discoveryNoDamage = neededRoll(ZIELWERT_FOUL, attacker.ag);
-  const discoveryMaxDamage = neededRoll(ZIELWERT_FOUL + Math.floor(maxDamage / 2), attacker.ag);
+  const rawMaxDamage = Math.max(0, (10 + attacker.st) - victim.rw);
+  const maxDamage = victimHasRobust ? Math.max(0, rawMaxDamage - 1) : rawMaxDamage;
+  const hinterhaeltigBonus = hasSkill(attacker, 'Hinterhältig') ? 1 : 0;
+  const discoveryNoDamage = neededRoll(ZIELWERT_FOUL - hinterhaeltigBonus, attacker.ag);
+  const discoveryMaxDamage = neededRoll(ZIELWERT_FOUL + Math.floor(maxDamage / 2) - hinterhaeltigBonus, attacker.ag);
 
   return `<b>🥾 Foul gegen #${victim.number}</b><br>` +
-    `<u>Verletzungscheck</u>: W10 + ST ${attacker.st} vs RW ${victim.rw} (aktuell SP ${victim.sp})<br>` +
+    `<u>Verletzungscheck</u>: W10 + ST ${attacker.st} vs RW ${victim.rw}${victimHasRobust ? ' (+1 Robust)' : ''} (aktuell SP ${victim.sp})<br>` +
     `benötigt Wurf ≥ ${injuryRoll.needed}${injuryRoll.note}, damit #${victim.number} sofort verletzt wird.<br><br>` +
-    `<u>Entdeckungswurf</u>: AG ${attacker.ag} gegen Ziel ${ZIELWERT_FOUL} + halber Schaden<br>` +
+    `<u>Entdeckungswurf</u>: AG ${attacker.ag} gegen Ziel ${ZIELWERT_FOUL}${hinterhaeltigBonus ? ' - 1 Hinterhältig' : ''} + halber Schaden<br>` +
     `benötigt Wurf ≥ ${discoveryNoDamage.needed}${discoveryNoDamage.note} (ohne Schaden) bis ` +
     `≥ ${discoveryMaxDamage.needed}${discoveryMaxDamage.note} (max. Schaden), um unentdeckt zu bleiben.`;
 }
@@ -2307,17 +2587,18 @@ function previewPassPreview(passer, receiver) {
   }
 
   const baseTarget = Math.ceil(5 + fields);
-  const tzPasser = countEnemyTackleZones(passer.x, passer.y, passer.team);
+  const tzPasser = hasSkill(passer, 'Ruhiger Kopf') ? 0 : countEnemyTackleZones(passer.x, passer.y, passer.team);
   const throwTarget = baseTarget + tzPasser;
-  const throwRoll = neededRoll(throwTarget, passer.pa);
+  const passerBonus = passer.pa + (hasSkill(passer, 'Zielwurf') ? 1 : 0);
+  const throwRoll = neededRoll(throwTarget, passerBonus);
 
-  const tzCatcher = countEnemyTackleZones(receiver.x, receiver.y, receiver.team);
+  const tzCatcher = hasSkill(receiver, 'Ruhiger Kopf') ? 0 : countEnemyTackleZones(receiver.x, receiver.y, receiver.team);
   const catchTarget = 8 + tzCatcher;
   const catchRoll = neededRoll(catchTarget, receiver.ag);
 
   return `<b>🎯 ${passDistanceLabel(fields)} zu #${receiver.number}</b> (${fields.toFixed(2)} Felder)<br>` +
     `<u>Wurf (#${passer.number})</u>: Ziel ${baseTarget}${tzPasser ? ' + ' + tzPasser + ' Tacklezone(n)' : ''} = ${throwTarget}<br>` +
-    `PA ${passer.pa} → benötigt Wurf ≥ ${throwRoll.needed}${throwRoll.note}<br><br>` +
+    `PA ${passer.pa}${hasSkill(passer, 'Zielwurf') ? ' + 1 (Zielwurf)' : ''} → benötigt Wurf ≥ ${throwRoll.needed}${throwRoll.note}<br><br>` +
     `<u>Fangen (#${receiver.number})</u>: Ziel 8${tzCatcher ? ' + ' + tzCatcher + ' Tacklezone(n)' : ''} = ${catchTarget}<br>` +
     `AG ${receiver.ag} → benötigt Wurf ≥ ${catchRoll.needed}${catchRoll.note}`;
 }

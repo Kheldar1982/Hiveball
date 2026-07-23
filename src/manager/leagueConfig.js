@@ -88,9 +88,23 @@ export const defaultLeagueConfig = {
     skillCosts: {
       Blitz: 100,
       Block: 100,
-      Zielwurf: 110,
-      "Ruhiger Kopf": 140,
-      Dodge: 150
+      Zielwurf: 100,
+      "Ruhiger Kopf": 125,
+      Dodge: 150,
+      // Ökonomie-Skill (kein Kernspiel-Effekt): kehrt das Gehalt dieses
+      // Spielers am Matchende in Sponsoreneinnahme um, siehe economy.js
+      // deductSalaries.
+      Sponsor: 125,
+      // Platzhalter-Preise, gerne anpassen: Ballsicher/Trittsicher als
+      // einfache situative +1-Boni günstiger, Robust/Gewandt teurer, da sie
+      // bei (fast) jedem Block/Tackle wirken.
+      Rückendeckung: 110,
+      Ballsicher: 100,
+      Robust: 125,
+      Gewandt: 125,
+      "Zweite Luft": 110,
+      Trittsicher: 100,
+      Hinterhältig: 110
     },
     additionalSkillMultiplier: { 1: 1.0, 2: 1.5, 3: 2.0, 4: 2.5 }
   },
@@ -156,13 +170,50 @@ export const defaultLeagueConfig = {
     // Reputationsänderung nach Elo-Prinzip (economy.js updateReputation).
     // opponentReputation ist ein Platzhalter, solange es nur den festen
     // KI-Gegner "Red AI" ohne eigenes Vereinsmodell gibt (echte Gegner/Liga
-    // erst Phase 3). prMultiplierByLevel kommt vom Level der
-    // Öffentlichkeitsarbeit.
+    // erst Phase 3). prBonusPerLevel kommt vom Level der Öffentlichkeitsarbeit
+    // und wirkt bewusst asymmetrisch (Nutzervorgabe: PR darf nie schaden) –
+    // bei Sieg (1 + Level*Bonus) verstärkt den Gewinn, bei Niederlage
+    // (1 - Level*Bonus) dämpft den Verlust, statt ihn wie ein reiner
+    // Multiplikator zu vergrößern.
     reputation: {
       opponentReputation: 50,
       k: 6,
       eloScale: 50,
-      prMultiplierByLevel: { 0: 1.0, 1: 1.1, 2: 1.2, 3: 1.3, 4: 1.4, 5: 1.5 }
+      prBonusPerLevel: 0.1
+    },
+
+    // Trainingscenter/Akademie: direkt kaderwirksam (mehr Trainings-/
+    // Skill-Slots pro Zyklus), deshalb teurer als die reinen
+    // Wirtschaftsgebäude. Gehen aktuell nur bis Level 3 (siehe
+    // training.physical.levels/training.theory.levels) – Level 4-5 sind laut
+    // Spezifikation explizit erst Phase 3.
+    physicalTraining: {
+      maxLevel: 3,
+      upgradeCost: { 2: 50000, 3: 125000 },
+      upkeepByLevel: { 1: 0, 2: 7000, 3: 16000 }
+    },
+    theoryTraining: {
+      maxLevel: 3,
+      upgradeCost: { 2: 50000, 3: 125000 },
+      upkeepByLevel: { 1: 0, 2: 7000, 3: 16000 }
+    },
+
+    // Medizinische Abteilung: etwas günstiger als Trainingscenter/Akademie,
+    // wichtig für Kadertiefe/Langlebigkeit, aber weniger direkt
+    // leistungssteigernd. Ebenfalls nur bis Level 3 (medical.slotsPerLevel).
+    medical: {
+      maxLevel: 3,
+      upgradeCost: { 2: 35000, 3: 90000 },
+      upkeepByLevel: { 1: 0, 2: 5000, 3: 11000 }
+    },
+
+    // Öffentlichkeitsarbeit: moderater bepreist als Fanshop, da der Nutzen
+    // (PR-Bonus oben) zweischneidig ist – anders als reine Zusatzeinnahmen
+    // ohne jedes Risiko.
+    publicRelations: {
+      maxLevel: 5,
+      upgradeCost: { 1: 10000, 2: 25000, 3: 60000, 4: 150000, 5: 375000 },
+      upkeepByLevel: { 1: 0, 2: 3000, 3: 7000, 4: 16000, 5: 35000 }
     },
 
     basePricesByPosition: {

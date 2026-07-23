@@ -153,7 +153,12 @@ erhalten und zählt sofort in Richtung des nächsten Punkts).
   lastMatchNomination: {
     starters: ["playerId", ...],  // genau 5
     bench: ["playerId", ...]      // bis zu 3
-  }
+  },
+
+  // Phase 2: wirtschaftliche Zusammenfassung des zuletzt gespielten Matches
+  // (siehe postMatch.js processPostMatch), Grundlage für finances.html.
+  // null, solange noch kein Match gespielt wurde.
+  lastMatchEconomy: null
 }
 ```
 
@@ -712,10 +717,103 @@ Spieler durch die Reps in die Trainings-Warteschlange gerutscht sind.
 Zusammenfassung zurück (`{ mvpId, players, economy }`) statt nur
 Seiteneffekte zu haben, damit die Anzeige keine Formel dupliziert.
 
-**Phase 2** – Öffentlichkeitsarbeit (vormals "Fan-Sektor"), Fanshop, Catering, Stadion, Unterhaltssystem für
-alle Gebäude; manuelle Wechselauswahl für den Menschen (statt automatischer
-Priorität); zweite Skill-Welle (Feldgeneral, Letzter Ausweg, Auf Kommando –
-Details in README/Konzept-Zusammenfassung); Marktwert-Formel-Vorarbeit.
+**Phase 2** (vollständig umgesetzt) – Öffentlichkeitsarbeit (vormals
+"Fan-Sektor"), Fanshop, Catering, Stadion, Unterhaltssystem für alle Gebäude:
+komplettes Ökonomie-Redesign (gestaffelte Gehälter nach Matchday-Rolle,
+Zuschauer-/Sponsor-/Fanshop-/Catering-Einnahmen, Reputation nach Elo-Prinzip
+mit asymmetrischem PR-Bonus, Ausbaukosten + laufender Unterhalt für alle
+sieben Gebäude aus `club.facilities`) ist fertig, siehe `economy.js`/
+`leagueConfig.js` und die jeweiligen Gebäude-Seiten (`stadium.html`,
+`training.html`, `academy.html`, `medical.html`, `public-relations.html`).
+**Manuelle Wechselauswahl für den Menschen** (statt automatischer Priorität)
+ist ebenfalls umgesetzt: `startKickoff()` in `hiveball.html` ersetzt Rot (KI)
+weiterhin automatisch (`autoSubstituteTeam`, gleiche Priorität wie zuvor),
+pausiert aber für Blau bei jeder offenen Vakanz (verletzter, noch nicht
+ersetzter Feldspieler) mit einem eingeblendeten Fenster
+(`#substitution-overlay`, analog zum Post-Match-Bildschirm) – zeigt alle 5
+Feld-Positionen, offene Slots bekommen eine Auswahltabelle mit der aktuellen
+Bank. Der "Fortsetzen"-Button ist erst klickbar, wenn entweder keine Vakanz
+mehr offen oder die Bank leer ist; im zweiten Fall spielt Blau bewusst in
+Unterzahl weiter (Slot wird als behandelt markiert, kein erneutes Aufpoppen
+bei künftigen Kickoffs).
+**Zweite Skill-Welle verworfen** (Nutzerentscheidung): Feldgeneral, Letzter
+Ausweg und Auf Kommando werden nicht umgesetzt – dazu existierte entgegen dem
+ursprünglichen Verweis ohnehin **keine** Beschreibung in README/
+Konzept-Zusammenfassung. Stattdessen: **Zielwurf** (+1 auf den Wurfversuch
+beim Passen) und **Ruhiger Kopf** (ignoriert gegnerische Tacklezonen beim
+Passen/Fangen, für Werfer und Fänger unabhängig) sind jetzt mit echter
+Spielwirkung versehen (`attemptPass`/`previewPassPreview` in `hiveball.html`)
+– vorher rein kaufbar/trainierbar ohne jede Wirkung. Neuer Skill **Sponsor**
+(Ökonomie-Ebene, kein Kernspiel-Effekt): am Matchende wird für diesen Spieler
+statt eines Gehalts derselbe Betrag als zusätzliche Einnahme verbucht (siehe
+`economy.js` `deductSalaries`) – "gute Kontakte zu einem eigenen Sponsor".
+
+**Sieben weitere Skills mit echter Spielwirkung ergänzt** (alle in
+`hiveball.html`, EP-Kosten in `leagueConfig.js` `xp.skillCosts`):
+- **Rückendeckung** (110 EP): unterstützt einen Block auch aus einer zweiten
+  gegnerischen Tacklezone heraus (normalerweise negiert das die Unterstützung
+  komplett) – dann aber nur +1 statt der halben BL. `getBlockAssists` gibt
+  seitdem `{ player, bonus }`-Objekte zurück statt roher Spielerobjekte
+  (alle 4 Aufrufstellen entsprechend angepasst).
+- **Ballsicher** (100 EP): +1 bei der Ballaufnahme vom Boden (`tryPickupBall`).
+- **Robust** (125 EP): -1 Schaden (Floor bei 0) beim Verletzungscheck als
+  Verlierer (`resolveInjuryCheck`) – repräsentiert erhöhte CO, auch wenn CO
+  in der Kernspiel-Formel nicht als eigener Term auftaucht (nur indirekt über
+  die SP-Poolgröße).
+- **Gewandt** (125 EP): +1 auf den Ausweichwurf (AG-Seite) beim Tackle,
+  unabhängig davon ob der Dodger in derselben Tacklezone bleibt
+  (`attemptLeavingTackleZones`).
+- **Zweite Luft** (110 EP): das erste Extrafeld einer Bewegung kostet keine
+  SP (ein Sturz dabei kostet aber weiterhin die übliche zusätzliche SP);
+  `availableExtraSquares`/`canAffordExtraSquare` berücksichtigen das auch für
+  die Pfadsuche und die KI-Budgetberechnung.
+- **Trittsicher** (100 EP): +1 auf den Erfolgswurf beim Extrafeld gehen
+  (`attemptExtraSquare`).
+- **Hinterhältig** (110 EP): -1 auf den Entdeckungs-Zielwert beim Foul
+  (`resolveFoul`/`evaluateFoulOutcome`/`previewFoulPreview`). Gleichzeitig
+  wurde die Basis-Konstante `ZIELWERT_FOUL` von 4 auf 5 angehoben (Nutzer-
+  Begründung: Foul ist nur 1×/Zug möglich, anders als z.B. Tacklezonen-
+  Situationen, die sehr oft vorkommen – Hinterhältig gleicht das für
+  spezialisierte Spieler exakt wieder aus, alle anderen haben es jetzt etwas
+  schwerer, unentdeckt zu bleiben).
+
+Marktwert-Formel-Vorarbeit ist bereits seit Phase 1 erledigt (Basisformel in
+`formulas.js` `calculateMarketValue`), die vollständige Formel bleibt bewusst
+Phase 3.
+
+**Gebäudeseiten zeigen jetzt aktuellen + künftigen Unterhalt** (Nutzeranfrage):
+`facilityUpgradeUI.js` `renderFacilityUpgradeRow` zeigt neben dem Level den
+laufenden Unterhalt des aktuellen Levels sowie – direkt hinter den
+Ausbaukosten für den nächsten Levelaufstieg – den Unterhalt, der ab diesem
+neuen Level anfällt. Gilt automatisch für alle fünf Gebäudeseiten, die diese
+gemeinsame Komponente nutzen.
+
+**Neue Seite `finances.html`** (Nutzeranfrage): zweispaltig – links die
+tatsächliche Abrechnung des letzten Spieltags, rechts eine reine
+Vorschau-Berechnung für den kommenden Spieltag auf Basis des aktuellen
+Vereinszustands. Dafür musste `club.lastMatchEconomy` neu eingeführt werden
+(`state.js` `createClub`, befüllt am Ende von `postMatch.js`
+`processPostMatch`) – vorher existierte die Post-Match-Auswertung nur als
+Rückgabewert und ging nach dem Schließen des Post-Match-Bildschirms
+unwiederbringlich verloren. Die Vorschau (`economy.js`
+`previewNextMatchEconomy`, rein lesend, keine Mutation/kein `saveClub`)
+nutzt die aktuelle Matchday-Nominierung als Annahme für die Gehaltsstaffel
+(echte Einwechslungen sind vorab nicht bekannt) und gibt würfelabhängige
+Posten (Zuschauer, davon abgeleitet Catering) als statistischen Durchschnitt
+zurück (`attendanceIsAverage: true`, `diceSides`) – die UI kennzeichnet das
+explizit mit "Ø". Die Siegprämie wird als eigener, ergebnisabhängiger Posten
+ausgewiesen statt in eine Summe eingerechnet zu werden (`netWithoutWin`/
+`netWithWin`). Dafür wurden `calculateFanshopIncome`/`calculateCateringIncome`
+exportiert und `deductFacilityUpkeep` in eine reine `calculateFacilityUpkeep`
+(intern) plus die mutierende Export-Funktion aufgeteilt, damit Vorschau und
+echte Abrechnung dieselbe Formel nutzen.
+
+**Navigation mehrfach nachjustiert** (Nutzeranfrage): "Stadion" und
+"Hall of Fame" vertauscht, "Finanzen" zwischen Öffentlichkeitsarbeit und
+Hall of Fame einsortiert. Aktuelle Reihenfolge in `layout.js` `NAV_ITEMS`:
+Übersicht, Nächstes Spiel, Kader, Trainingscenter, Akademie, Stadion,
+Medizinische Abteilung, Öffentlichkeitsarbeit, Finanzen, Hall of Fame,
+Einstellungen.
 
 **Phase 3** – Vollständige Marktwert-Formel, Multi-Liga mit echter
 Admin-Rolle und Persistenz pro Liga, Trainingsgebäude-Level 4-5, flexible

@@ -22,10 +22,12 @@ Zwei-Teile-Architektur:
 
 - **Kernspiel**: das eigentliche rundenbasierte Match, 5 gegen 5 (bzw. mehr
   bei Bank-Wechseln, siehe unten).
-- **Manager-Teil** (im Aufbau, siehe `docs/hiveball_manager_spezifikation.md`
-  und `src/manager/`): Kader-Verwaltung, Kauf/Verkauf, Training, Aging,
-  Matchday-Nominierung. Persistiert über `localStorage`, geteilt mit dem
-  Kernspiel (siehe Abschnitt 2).
+- **Manager-Teil** (Phase 1+2 abgeschlossen, Phase 3 offen – siehe
+  `docs/hiveball_manager_spezifikation.md` und `src/manager/`):
+  Kader-Verwaltung, Kauf/Verkauf, Training, Aging, Matchday-Nominierung,
+  sieben ausbaubare Gebäude, komplette Vereinsökonomie, manuelle
+  Wechselauswahl. Persistiert über `localStorage`, geteilt mit dem Kernspiel
+  (siehe Abschnitt 2).
 
 ## 2. Aktueller Stand der Datei
 
@@ -99,13 +101,70 @@ Seit Phase 1k zeigt `endGame()` außerdem einen Post-Match-Bildschirm
 Touchdown-Verlauf (Zug/Team/Spieler), eine kombinierte Spielerliste beider
 Teams (Match-Statistik für alle, Reps/EP zusätzlich für Blau-Spieler mit
 echter Kaderanbindung – Rot hat grundsätzlich keinen persistenten Verein und
-zeigt dort bewusst „–") sowie die Vereinskasse (Kontostand vorher/nachher,
-Gehälter, Sieg-/Spieleinnahme – ein Gebäude-Unterhalt oder weitere
-Einnahmequellen existieren als Kostenposten noch nicht, das ist Phase 2).
-Dazu MVP-Hervorhebung sowie Hinweise zu Verletzungen/Zwangsrenten und neu
-fürs Training angemeldeten Spielern. `processPostMatch()` in
-`src/manager/postMatch.js` gibt dafür jetzt eine strukturierte
+zeigt dort bewusst „–"), die vollständig aufgeschlüsselte Vereinskasse (siehe
+Phase 2 unten) sowie MVP-Hervorhebung und Hinweise zu Verletzungen/
+Zwangsrenten und neu fürs Training angemeldeten Spielern. `processPostMatch()`
+in `src/manager/postMatch.js` gibt dafür jetzt eine strukturierte
 Zusammenfassung zurück statt nur Seiteneffekte zu haben.
+
+**Phase 2 (Ökonomie-Redesign + Gebäude) ist umgesetzt.** Die ursprünglichen
+Gehälter (pauschal 9 % des Marktwerts fürs gesamte Kader) deckten die
+Einnahmen (nur Siegprämie) bei Weitem nicht – komplett neu aufgebaut:
+
+- **Gehälter** gestaffelt nach der tatsächlichen Rolle in DIESEM Match (nicht
+  der reinen Vor-Match-Nominierung): Feld 10 %, Bank 5 %, Frei 2 % des
+  Marktwerts. Einwechselspieler zahlen den Feld-Satz, auch wenn sie vor dem
+  Match nur als Bank nominiert waren (`src/manager/economy.js`
+  `deductSalaries`).
+- **Einnahmen pro Match:** Zuschauer (würfelbasiert – Reputation × 100 pro
+  Pip, Würfelgröße abhängig vom Stadion-Level: W6/W8/W10/W15/W20 für Level
+  1–5), fester Sponsor (20.000 €), Siegprämie (8.000 €), Fanshop
+  (reputationsabhängig, Levelbasis × Reputation/50), Catering (fester
+  Prozentsatz der Zuschauereinnahme DIESES Matches, steigt pro Level).
+- **Reputation** ändert sich nach Sieg/Niederlage nach Elo-Prinzip (Erwartung
+  aus der Differenz zur – aktuell nur als Platzhalter existierenden –
+  Gegner-Reputation). Der PR-Bonus aus dem Öffentlichkeitsarbeit-Level wirkt
+  bewusst asymmetrisch: verstärkt den Gewinn bei Sieg, dämpft aber den
+  Verlust bei Niederlage – kann also nie schaden.
+- **Sieben Gebäude** (`club.facilities`): Trainingscenter, Akademie,
+  Medizinische Abteilung starten kostenlos bei Level 1 (wie zuvor); Stadion
+  ebenfalls (ein Verein braucht immer eine Spielstätte); Fanshop, Catering
+  und Öffentlichkeitsarbeit (vormals "Fan-Sektor", nie mit echter Funktion
+  belegt) starten bei Level 0. Jedes Gebäude hat Ausbaukosten (einmalig,
+  geometrisch wachsend) und laufenden Unterhalt pro Match (Level 1 überall
+  unterhaltsfrei) – siehe `leagueConfig.js` `economy.{stadium,fanshop,
+  catering,physicalTraining,theoryTraining,medical,publicRelations}`.
+  Fanshop/Catering dürfen nie über das aktuelle Stadion-Level hinaus
+  ausgebaut werden. Eigene Seiten je Gebäude (`stadium.html` bündelt
+  Stadion+Fanshop+Catering, dazu `training.html`, `academy.html`,
+  `medical.html`, `public-relations.html`) zeigen Level, aktuellen **und**
+  künftigen Unterhalt sowie den Ausbau-Button – die gemeinsame
+  `facilityUpgradeUI.js` rendert das für alle fünf Seiten identisch.
+- **Skill "Sponsor"**: kein Kernspiel-Effekt – kehrt für den betreffenden
+  Spieler das sonst fällige Gehalt in eine gleich hohe Sponsoreneinnahme des
+  Vereins um ("gute Kontakte zu einem eigenen Sponsor").
+- **Neue Seite `finances.html`**: links die tatsächliche Abrechnung des
+  letzten Spieltags (`club.lastMatchEconomy`, persistiert seit Ende der
+  Phase-2-Arbeiten – vorher gingen diese Zahlen nach dem Post-Match-Bildschirm
+  verloren), rechts eine reine Vorschau-Berechnung für den kommenden
+  Spieltag auf Basis des aktuellen Vereinszustands
+  (`previewNextMatchEconomy`). Würfelabhängige Posten (Zuschauer, davon
+  abgeleitet Catering) sind dort klar als statistischer Durchschnitt (Ø)
+  gekennzeichnet, die Siegprämie separat als "nur bei Sieg" ausgewiesen.
+
+**Manuelle Wechselauswahl** (ebenfalls Phase 2, ersetzt die bis dahin
+automatische Priorität für Blau): `startKickoff()` in `hiveball.html`
+ersetzt Rot (KI) weiterhin automatisch (gleiche Position → Lineman →
+beliebig), pausiert aber für Blau bei jeder offenen Vakanz (verletzter, noch
+nicht ersetzter Feldspieler) mit einem eingeblendeten Fenster
+(`#substitution-overlay`, analog zum Post-Match-Bildschirm): alle 5
+Feld-Positionen sichtbar, offene Slots mit Auswahltabelle aus der aktuellen
+Bank. "Fortsetzen" wird erst klickbar, wenn alle Slots besetzt sind oder die
+Bank leer ist – im zweiten Fall spielt Blau bewusst in Unterzahl weiter.
+Wichtiger Bugfix dabei: `endTurn()` darf erst laufen, **nachdem** der Kickoff
+(inkl. dieser Wechselauswahl) wirklich abgeschlossen ist – sonst schaltete
+Rot (KI) bereits während des offenen Wechselfensters unsichtbar auf
+veralteten (noch nicht zurückgesetzten) Positionen weiter.
 
 Zwei Teams: **Blau** (menschlich gesteuert) gegen **Rot** (einfache KI).
 
@@ -170,13 +229,17 @@ damit – die Rüstungsfunktion, für die er ursprünglich als Provisorium dient
 Sind die regulären MR aufgebraucht, kann sich jeder Spieler bis zu
 `MAX_EXTRA_SQUARES = 2` zusätzliche Felder bewegen (`availableExtraSquares`,
 `attemptExtraSquare`). Jedes Extrafeld kostet `EXTRA_SQUARE_SP_COST = 1` SP
-statt eines Bewegungspunkts und erfordert einen Agilitätswurf (`W10 + AG`)
-gegen `EXTRA_SQUARE_TARGET = 10`. Wie viele Extrafelder tatsächlich verfügbar
-sind, wird zusätzlich durch die aktuellen SP begrenzt (ein Extrafeld ohne SP
-ist nicht möglich). Bei einem Fehlschlag stürzt der Spieler an seiner
-aktuellen Position, verliert zusätzlich `EXTRA_SQUARE_SP_COST` SP (insgesamt
-also 2 SP für dieses Extrafeld) und die Bewegung endet dort – ein getragener
-Ball fällt dabei zu Boden und verspringt wie bei jedem anderen Sturz.
+statt eines Bewegungspunkts und erfordert einen Agilitätswurf (`W10 + AG`,
+mit dem Skill **Trittsicher**: +1) gegen `EXTRA_SQUARE_TARGET = 10`. Wie
+viele Extrafelder tatsächlich verfügbar sind, wird zusätzlich durch die
+aktuellen SP begrenzt (ein Extrafeld ohne SP ist normalerweise nicht
+möglich – außer mit dem Skill **Zweite Luft**, der das erste Extrafeld einer
+Bewegung von den SP-Kosten befreit, siehe `canAffordExtraSquare`). Bei einem
+Fehlschlag stürzt der Spieler an seiner aktuellen Position, verliert
+zusätzlich `EXTRA_SQUARE_SP_COST` SP (insgesamt also 2 SP für dieses
+Extrafeld, bzw. 1 SP mit Zweite Luft) und die Bewegung endet dort – ein
+getragener Ball fällt dabei zu Boden und verspringt wie bei jedem anderen
+Sturz.
 
 Gilt gleichermaßen für Mensch (`movePlayer`) und KI (`aiAdvanceCarefully`);
 die grün/gelb eingefärbten erreichbaren Felder auf dem Spielfeld sowie die
@@ -187,15 +250,34 @@ erreichbaren Feldern (grün) und nur über Extrafelder erreichbaren Feldern
 ### Skills
 
 Jede Position kann von Beginn an feste Skills mitbringen (`POSITIONS[...].skills`,
-übernommen in `player.skills`). Bislang implementiert:
+übernommen in `player.skills`). Alle übrigen Skills werden im Manager-Teil
+gegen EP gekauft und über die Akademie trainiert (`src/manager/skills.js`,
+`leagueConfig.js` `xp.skillCosts`) – Werfer hat weiterhin keinen eigenen
+**Start**-Skill, kann aber wie jede Position zusätzliche Skills erlernen.
+Zwölf Skills sind mittlerweile mit echter Wirkung implementiert:
 
-| Position | Skill    | Effekt |
-|----------|----------|--------|
-| Läufer   | **Blitz** | Kein Bewegungsabzug beim Blocken (siehe Abschnitt 7a), auch wenn vorher MR verbraucht wurden. |
-| Blocker  | **Block** | Beim Blocken (nicht beim Tackeln) +1 auf den Blockwurf, für Blocker *und* Geblockten. Hat nur einer von beiden diesen Skill, gewinnt er den Block auch bei Gleichstand automatisch, der andere stürzt. |
-| Fänger   | **Dodge** | Wird geblockt, wirft der Fänger AG statt BL. Gewinnt er (oder hält den Block zu seinen Gunsten), fällt der Angreifer *nicht* wie sonst üblich – außer der Angreifer würfelt dabei selbst eine natürliche 1. |
+| Skill | Effekt |
+|-------|--------|
+| **Blitz** (Läufer-Start) | Kein Bewegungsabzug beim Blocken (siehe Abschnitt 7a), auch wenn vorher MR verbraucht wurden. |
+| **Block** (Blocker-Start) | Beim Blocken (nicht beim Tackeln) +1 auf den Blockwurf, für Blocker *und* Geblockten. Hat nur einer von beiden diesen Skill, gewinnt er den Block auch bei Gleichstand automatisch, der andere stürzt. |
+| **Dodge** (Fänger-Start) | Wird geblockt, wirft der Spieler AG statt BL. Gewinnt er, fällt der Angreifer *nicht* wie sonst üblich – außer der Angreifer würfelt dabei selbst eine natürliche 1. |
+| **Zielwurf** | +1 auf den Wurfversuch beim Passen (`attemptPass`). |
+| **Ruhiger Kopf** | Ignoriert gegnerische Tacklezonen beim Passen bzw. Fangen (kein Malus) – für Werfer und Fänger unabhängig voneinander. |
+| **Rückendeckung** | Unterstützt einen Block auch aus einer zweiten gegnerischen Tacklezone heraus (normalerweise negiert das die Unterstützung komplett) – dann aber nur mit +1 statt der halben BL (`getBlockAssists`). |
+| **Ballsicher** | +1 bei der Ballaufnahme vom Boden (`tryPickupBall`). |
+| **Robust** | -1 Schaden (Floor bei 0) beim Verletzungscheck als Verlierer – repräsentiert erhöhte CO (`resolveInjuryCheck`). |
+| **Gewandt** | +1 auf den Ausweichwurf (AG-Seite) beim Tackle, immer (`attemptLeavingTackleZones`). |
+| **Zweite Luft** | Das erste Extrafeld einer Bewegung kostet keine Stamina (ein Sturz dabei kostet weiterhin die übliche zusätzliche SP). |
+| **Trittsicher** | +1 auf den Erfolgswurf beim Extrafeld gehen (`attemptExtraSquare`). |
+| **Hinterhältig** | -1 auf den Entdeckungs-Zielwert beim Foul (siehe Abschnitt 7c) – gleicht die dortige Anhebung des Basis-Zielwerts für spezialisierte Spieler wieder aus. |
 
-Weitere Positionen/Skills sind als Ausbaustufe vorgesehen (siehe Offene Punkte).
+Dazu ein rein ökonomischer Skill ohne Kernspiel-Effekt: **Sponsor** (siehe
+Phase 2 in Abschnitt 2) kehrt das Gehalt des Spielers in eine gleich hohe
+Sponsoreneinnahme um.
+
+Eine geplante "zweite Skill-Welle" (Feldgeneral, Letzter Ausweg, Auf
+Kommando) wurde verworfen – dafür gab es nie eine konkrete Definition,
+stattdessen wurden die zwölf Skills oben umgesetzt.
 
 ## 5. Würfelsystem
 
@@ -328,8 +410,9 @@ Hinweis statt der Aktion.
    SP ≤ 0 = verletzt. Kein Opposed-Wurf, keine Krit-10/Krit-1-Sonderregel
    (das Opfer liegt bereits am Boden und wehrt sich nicht).
 2. **Entdeckungswurf** (`rollAgainstTarget`, danach, mit dem Schaden aus
-   Schritt 1): AG des Foulenden gegen `ZIELWERT_FOUL = 4`, erschwert um
-   `Math.floor(Schaden / 2)`. Erfolg = Foul bleibt unentdeckt. Fehlschlag =
+   Schritt 1): AG des Foulenden gegen `ZIELWERT_FOUL = 5`, erschwert um
+   `Math.floor(Schaden / 2)` (mit dem Skill **Hinterhältig**: -1 auf diesen
+   Zielwert). Erfolg = Foul bleibt unentdeckt. Fehlschlag =
    Platzverweis: der Foulende scheidet aus wie ein Verletzter (`injured =
    true`), erleidet dabei aber selbst **keinen** SP-Schaden. Zur
    Unterscheidung von einer echten Verletzung (z.B. für eine spätere
@@ -343,9 +426,13 @@ kombiniert bewusst AG (Heimlichkeit) mit dem halbierten Schaden aus Schritt 1
 (Brutalität). Dadurch ergibt sich ein Positions-Trade-off: ein Blocker (hohe
 ST, niedrige AG) richtet im Foul viel Schaden an, wird aber deutlich öfter
 erwischt; ein Fänger/Läufer (hohe AG, niedrige ST) foult "sauberer" – kaum
-Schaden, aber auch ein deutlich geringeres Entdeckungsrisiko. Bei Zielwert 4
-liegt das Grundrisiko (ohne Schadensfolge) bei ca. 30 % Entdeckung für einen
-durchschnittlichen Wert, das durch angerichteten Schaden weiter steigt.
+Schaden, aber auch ein deutlich geringeres Entdeckungsrisiko. Bei Zielwert 5
+liegt das Grundrisiko (ohne Schadensfolge) bei ca. 40 % Entdeckung für einen
+durchschnittlichen Wert, das durch angerichteten Schaden weiter steigt. Der
+Zielwert wurde bewusst von 4 auf 5 angehoben (Nutzer-Begründung: Foul ist nur
+1×/Zug möglich, anders als z.B. Tacklezonen-Situationen, die sehr oft
+vorkommen) – der Skill **Hinterhältig** (siehe Abschnitt 4) gleicht das für
+spezialisierte Spieler exakt wieder auf den alten Wert aus.
 
 **KI:** Rot erwägt ein Foul, wenn ein liegender blauer Gegner direkt angrenzt
 und noch keine Aktion in diesem Zug stattgefunden hat (`evaluateFoulOutcome`,
@@ -447,12 +534,14 @@ schwerer als normal.
 
 ## Offene Punkte / Nächste Schritte
 
-- **Manager-Teil** ist konzeptionell vorgesehen, aber im Code noch nicht
-  begonnen: Kader-Verwaltung, Kauf/Verkauf, Training, Stadion, Werbung,
-  Liga-System.
-- Keine Persistenz/Speicherung – Spielstand geht bei Neuladen verloren.
-  Relevant, sobald ein Manager-Teil mit Kader über mehrere Spiele hinweg
-  existieren soll.
+- **Manager-Teil**: Phase 1 (Kader, Training, Aging, Matchday-Nominierung,
+  Verletzungen, Hall of Fame) und Phase 2 (Ökonomie-Redesign, sieben
+  Gebäude, manuelle Wechselauswahl, neun neue Skills) sind vollständig
+  umgesetzt (siehe Abschnitt 2 sowie `docs/hiveball_manager_spezifikation.md`
+  Abschnitt 10 für den detaillierten Phasenplan-Verlauf). Noch offen: die
+  Ausbaustufen aus Abschnitt 11 der Spezifikation (u.a. vollständige
+  Marktwert-Formel, Multi-Liga, Trainingsgebäude-Level 4-5, flexible
+  Startformationen) sind bewusst Phase 3.
 - RW und SP fließen in den Verletzungscheck (siehe 7b) und in Extrafelder
   (siehe Abschnitt 4) ein. SP regeneriert bislang nur nach einem Touchdown
   (siehe Abschnitt 11, `regenerateStaminaAfterTouchdown`), sonst gibt es kein
@@ -463,9 +552,10 @@ schwerer als normal.
   Extrafelder mehr gehen. Da die Touchdown-Regeneration nur für `SP > 0`
   greift, regeneriert ein Spieler, der exakt bei 0 oder darunter steht, dabei
   nicht mehr – ein Grenzfall, den die aktuelle Regel wörtlich so vorgibt.
-- **Skills** sind als System angelegt (`POSITIONS[...].skills`, `player.skills`,
-  `hasSkill`), bislang für Läufer (Blitz), Blocker (Block) und Fänger (Dodge)
-  belegt. Werfer hat noch keinen eigenen Skill – vorgesehen als nächster Schritt.
+- **Skills**: zwölf mit echter Wirkung implementiert (siehe Abschnitt 4).
+  Werfer hat weiterhin keinen eigenen **Start**-Skill (nur die drei anderen
+  Positionen haben einen von Anfang an) – kann aber wie jede Position
+  zusätzliche Skills über die Akademie erlernen.
 - KI wirft nicht selbst (keine Pass-Entscheidungslogik für Rot).
 - `sentOff` (siehe 7c) ist rein informativ und wird aktuell nirgends
   ausgewertet – vorgesehen für eine spätere Statistik/den Manager-Teil, um
@@ -481,29 +571,34 @@ hiveball/
 │   └── dev-server.mjs                          ← statischer Dev-Server (ohne ihn blockieren Browser die ES-Module über file://)
 ├── src/
 │   ├── hiveball.html                           ← Kernspiel-Prototyp (HTML/CSS/JS, keine Deps)
-│   └── manager/                                ← Manager-Teil, im Aufbau (siehe Spezifikation)
+│   └── manager/                                ← Manager-Teil (Phase 1+2 abgeschlossen, siehe Spezifikation)
 │       ├── overview.html                       ← Übersicht (Kasse, Teamwert, Kadergröße, Gebäude-Level) – Startseite
+│       ├── finances.html                       ← Finanzen: letzter Spieltag (tatsächlich) + nächster Spieltag (Vorschau)
+│       ├── next-match.html                     ← Matchday-Nominierung + Spielstart aus dem Manager heraus
 │       ├── index.html                          ← minimale Kader-UI (Verein anlegen, Spieler/Skills kaufen)
-│       ├── training.html                       ← Trainingscenter-UI (physisches Training, Slot-Auswahl)
-│       ├── academy.html                        ← Akademie-UI (Theorie-Training/Skills, Slot-Auswahl)
+│       ├── training.html                       ← Trainingscenter-UI (physisches Training, Slot-Auswahl, Ausbau)
+│       ├── academy.html                        ← Akademie-UI (Theorie-Training/Skills, Slot-Auswahl, Ausbau)
+│       ├── stadium.html                        ← Stadion + Fanshop + Catering (Level, Ausbau, Unterhalt)
+│       ├── medical.html                        ← Medizinische Abteilung (Behandlungsplätze, Ausbau)
+│       ├── public-relations.html                ← Öffentlichkeitsarbeit (PR-Bonus auf Reputation, Ausbau)
 │       ├── hall-of-fame.html                   ← ausgeschiedene Spieler mit Statistik/Ausscheidegrund
-│       ├── medical.html                        ← Medizinische Abteilung (Behandlungsplätze)
 │       ├── settings.html                       ← Settings-UI für leagueConfig (generischer Editor)
 │       ├── layout.js                           ← gemeinsame Kopfzeile (Logo-Slot + Navigation) aller Seiten
+│       ├── facilityUpgradeUI.js                ← gemeinsame Ausbau-Zeile (Icon/Level/Unterhalt/Button) für alle Gebäudeseiten
 │       ├── manager.css                         ← gemeinsames Stylesheet (Anthrazit-Theme)
 │       ├── leagueConfig.js                     ← Default-Konfiguration der Liga
 │       ├── positions.js                        ← Positions-/Preistabelle inkl. Lineman
 │       ├── state.js                            ← Datenmodell (ManagerPlayer, Club) + Persistenz
 │       ├── formulas.js                         ← Formeln: Marktwert, Skill-Preis/-Limit, Reps-Schwelle/Maximalwert, Alter/Verfallschance
 │       ├── transferMarket.js                   ← einfacher Transfermarkt (Spieler kaufen)
-│       ├── economy.js                          ← Vereinskasse (Gehälter, Siegprämie)
+│       ├── economy.js                          ← Vereinskasse: Gehälter, Zuschauer/Sponsor/Fanshop/Catering-Einnahmen, Reputation (Elo), Gebäude-Ausbau/-Unterhalt, Vorschau-Berechnung
 │       ├── skills.js                           ← EP-für-Skills (Skill-Kauf gegen XP)
 │       ├── training.js                         ← Reps-Sammlung + physisches Training (Warteschlange verbrauchen)
 │       ├── aging.js                            ← Aging-System (Formel 3.5) + Zwangsrente (Formel 3.8)
 │       ├── nomination.js                       ← Matchday-Status je Spieler (Feld/Bank/Frei), direkt im Kader
 │       ├── injury.js                           ← Verletzungsschwere (Formel 3.6) + Ausfallzähler-Heilung
 │       ├── medical.js                          ← Behandlungsplätze (Formel 3.7, Slot-Verwaltung)
-│       └── postMatch.js                        ← Post-Match-Verarbeitung (EP, Reps-Gutschrift, MVP, Kasse; Abschnitt 4)
+│       └── postMatch.js                        ← Post-Match-Verarbeitung (EP, Reps-Gutschrift, MVP, volle Kassen-Abrechnung; Abschnitt 4)
 └── docs/
     ├── Hiveball_Manager_Regelwerk_v0_12.pdf     ← ursprüngliches Design-/Regeldokument
     └── hiveball_manager_spezifikation.md        ← technische Spezifikation Manager-Teil
@@ -516,6 +611,10 @@ Design-Entscheidung für den Kernspiel-Prototyp (keine Build-Schritte, überall
 lauffähig) und ist mit der Manager-Integration (Phase 1g) an genau der
 vorgesehenen Stelle aufgeweicht worden: die Datei ist jetzt ein ES-Modul und
 importiert `src/manager/state.js`, um Blaus Aufstellung aus einem echten
-Verein zu laden. Weiterhin **kein Build-Schritt** (ES-Module laufen auch über
-`file://`), aber kein reines Einzeldatei-Prototyp mehr. Ohne Verein bleibt das
-Kernspiel über den TEAM_ROSTER-Fallback weiterhin eigenständig spielbar.
+Verein zu laden. Weiterhin **kein echter Build-Schritt** (der `dev-server.mjs`
+aus Abschnitt 2 ist nur ein statischer Dateiserver, keine Kompilierung), aber
+kein reines Einzeldatei-Prototyp mehr – und wegen der ES-Module jetzt zwingend
+über `http://localhost:8420/...` zu öffnen, **nicht** per Doppelklick/`file://`
+(siehe Abschnitt 2, blockieren normale Browser aus Sicherheitsgründen). Ohne
+Verein bleibt das Kernspiel über den TEAM_ROSTER-Fallback weiterhin
+eigenständig spielbar.

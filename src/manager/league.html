@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Hiveball Manager – Liga</title>
+<link rel="stylesheet" href="manager.css">
+</head>
+<body>
+<div id="app-header"></div>
+<h1 id="pageTitle">Liga</h1>
+
+<div id="noClub" hidden><p>Kein Verein gefunden – zuerst auf der Kader-Seite einen Verein anlegen.</p></div>
+
+<div id="view" hidden>
+  <div id="seasonBanner" class="season-banner" hidden></div>
+
+  <div class="tabs">
+    <button id="tabTable" class="tab-btn active">Tabelle</button>
+    <button id="tabSchedule" class="tab-btn">Spielplan</button>
+  </div>
+
+  <div id="panelTable" class="tab-panel">
+    <table>
+      <thead>
+        <tr>
+          <th class="num">#</th>
+          <th>Team</th>
+          <th>Stärke</th>
+          <th class="num" title="Spiele">Sp</th>
+          <th class="num" title="Siege">S</th>
+          <th class="num" title="Unentschieden">U</th>
+          <th class="num" title="Niederlagen">N</th>
+          <th class="num" title="Touchdowns erzielt : erhalten">TD</th>
+          <th class="num" title="TD-Differenz">Diff</th>
+          <th class="num" title="Verletzungsdifferenz (zugefügt − erlitten)">±Verl</th>
+          <th class="num" title="Punkte">Pkt</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+    <p class="hint">3 Punkte pro Sieg, 1 pro Unentschieden. Gleichstand: TD-Differenz → TD erzielt → Verletzungsdifferenz.</p>
+  </div>
+
+  <div id="panelSchedule" class="tab-panel" hidden>
+    <div class="matchday-nav">
+      <button id="mdPrev">◀</button>
+      <span class="md-label" id="mdLabel"></span>
+      <button id="mdNext">▶</button>
+    </div>
+    <div id="fixtures"></div>
+  </div>
+</div>
+
+<script type="module">
+  import { loadClub, listClubIds, loadPlayers, saveClub } from './state.js';
+  import {
+    ensureLeague, computeStandings, PLAYER_TEAM_ID, teamName,
+    rateRoster, starsForTeam, startNewSeason,
+  } from './league.js';
+  import { renderHeader } from './layout.js';
+
+  renderHeader('league');
+  const el = (id) => document.getElementById(id);
+  const stars = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
+  const signed = (n) => (n > 0 ? `+${n}` : `${n}`);
+
+  let club = null;
+  let league = null;
+  let playerRating = 0;
+  let viewMd = 0;
+
+  function renderTable() {
+    const rows = computeStandings(club);
+    const body = el('tableBody');
+    body.innerHTML = '';
+    rows.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      if (r.isPlayer) tr.className = 'is-player';
+      const cells = [
+        { t: `${i + 1}`, num: true },
+        { t: r.name },
+        { t: stars(starsForTeam(r.id, playerRating)), cls: 'stars' },
+        { t: `${r.sp}`, num: true },
+        { t: `${r.w}`, num: true },
+        { t: `${r.d}`, num: true },
+        { t: `${r.l}`, num: true },
+        { t: `${r.tdFor}:${r.tdAgainst}`, num: true },
+        { t: signed(r.tdFor - r.tdAgainst), num: true },
+        { t: signed(r.injFor - r.injAgainst), num: true },
+        { t: `${r.pts}`, num: true },
+      ];
+      for (const c of cells) {
+        const td = document.createElement('td');
+        td.textContent = c.t;
+        if (c.num) td.className = 'num';
+        if (c.cls) td.className = (td.className ? td.className + ' ' : '') + c.cls;
+        tr.appendChild(td);
+      }
+      body.appendChild(tr);
+    });
+  }
+
+  function matchdayTag(mdIndex) {
+    const md = league.schedule[mdIndex];
+    const allPlayed = md.every((f) => f.result);
+    if (allPlayed) return '(gespielt)';
+    if (mdIndex === league.currentMatchday && !league.seasonComplete) return '(aktuell)';
+    return '(anstehend)';
+  }
+
+  function renderSchedule() {
+    const total = league.schedule.length;
+    el('mdLabel').innerHTML =
+      `Spieltag ${viewMd + 1} / ${total} <span class="md-tag">${matchdayTag(viewMd)}</span>`;
+    el('mdPrev').disabled = viewMd <= 0;
+    el('mdNext').disabled = viewMd >= total - 1;
+
+    const container = el('fixtures');
+    container.innerHTML = '';
+    for (const f of league.schedule[viewMd]) {
+      const row = document.createElement('div');
+      row.className = 'fixture';
+      if (f.home === PLAYER_TEAM_ID || f.away === PLAYER_TEAM_ID) row.classList.add('is-player');
+
+      const home = document.createElement('span');
+      home.className = 'home';
+      home.textContent = teamName(club, f.home);
+
+      const score = document.createElement('span');
+      if (f.result) {
+        score.className = 'fx-score';
+        score.textContent = `${f.result.homeTd} : ${f.result.awayTd}`;
+      } else {
+        score.className = 'fx-score pending';
+        score.textContent = '– : –';
+      }
+
+      const away = document.createElement('span');
+      away.className = 'away';
+      away.textContent = teamName(club, f.away);
+
+      row.append(home, score, away);
+      container.appendChild(row);
+    }
+  }
+
+  function renderSeasonBanner() {
+    const banner = el('seasonBanner');
+    if (!league.seasonComplete) {
+      banner.hidden = true;
+      return;
+    }
+    const champion = computeStandings(club)[0];
+    banner.hidden = false;
+    banner.innerHTML = '';
+    const text = document.createElement('span');
+    text.textContent = `Saison ${league.seasonNumber} beendet – Meister: ${champion.name}. `;
+    const btn = document.createElement('button');
+    btn.textContent = 'Neue Saison starten';
+    btn.addEventListener('click', () => {
+      startNewSeason(club);
+      league = club.league;
+      viewMd = league.currentMatchday;
+      renderAll();
+    });
+    banner.append(text, btn);
+  }
+
+  function renderAll() {
+    el('pageTitle').textContent = `Liga – Saison ${league.seasonNumber}`;
+    renderSeasonBanner();
+    renderTable();
+    renderSchedule();
+  }
+
+  function activate(tab) {
+    const isTable = tab === 'table';
+    el('tabTable').classList.toggle('active', isTable);
+    el('tabSchedule').classList.toggle('active', !isTable);
+    el('panelTable').hidden = !isTable;
+    el('panelSchedule').hidden = isTable;
+  }
+
+  const ids = listClubIds();
+  if (ids.length === 0) {
+    el('noClub').hidden = false;
+  } else {
+    club = loadClub(ids[0]);
+    league = ensureLeague(club);
+    playerRating = rateRoster(loadPlayers(club.roster));
+    // Beim Öffnen den aktuellen (bzw. letzten) Spieltag zeigen.
+    viewMd = Math.min(league.currentMatchday, league.schedule.length - 1);
+
+    el('view').hidden = false;
+    el('tabTable').addEventListener('click', () => activate('table'));
+    el('tabSchedule').addEventListener('click', () => activate('schedule'));
+    el('mdPrev').addEventListener('click', () => { if (viewMd > 0) { viewMd--; renderSchedule(); } });
+    el('mdNext').addEventListener('click', () => {
+      if (viewMd < league.schedule.length - 1) { viewMd++; renderSchedule(); }
+    });
+
+    renderAll();
+  }
+</script>
+</body>
+</html>
