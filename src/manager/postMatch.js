@@ -28,6 +28,7 @@ import { healRosterByOneGame, applyInjurySeverity } from './injury.js';
 import { checkAgeCycleAndDecline } from './aging.js';
 import { creditReps, TRAINABLE_ATTRIBUTES } from './training.js';
 import { deductSalaries, payMatchIncome, updateReputation, deductFacilityUpkeep } from './economy.js';
+import { currentOpponentId, opponentReputation as lookupOpponentReputation } from './league.js';
 
 // MVP (Spezifikation Abschnitt 4): höchste Summe aus Touchdowns, gewonnenen
 // Blocks, Fängen, abgeschlossenen Pässen und überstandenen Tackles im Match.
@@ -135,7 +136,18 @@ export function processPostMatch(club, matchResults, won, config = defaultLeague
   const income = payMatchIncome(club, won, config);
   const facilityUpkeep = deductFacilityUpkeep(club, config);
   const reputationBefore = club.reputation;
-  const reputationDelta = updateReputation(club, won, config);
+  // Reputationsänderung gegen die feste Startreputation des tatsächlichen
+  // Liga-Gegners dieses Spieltags (opponents.js startingReputation, siehe
+  // economy.js updateReputation) statt der bisherigen fixen 50 – noch vor
+  // recordPlayerLeagueResult() aufgerufen (hiveball.html), currentOpponentId
+  // liefert daher noch den gerade gespielten Gegner. Ohne Liga (z.B. sehr
+  // alter Spielstand) liefert currentOpponentId null, updateReputation fällt
+  // dann auf den leagueConfig-Platzhalter zurück.
+  const opponentId = currentOpponentId(club);
+  const opponentRep = opponentId ? lookupOpponentReputation(opponentId) : null;
+  const reputationDelta = opponentRep != null
+    ? updateReputation(club, won, config, opponentRep)
+    : updateReputation(club, won, config);
 
   const economy = {
     moneyBefore,

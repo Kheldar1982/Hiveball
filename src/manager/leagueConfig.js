@@ -168,9 +168,11 @@ export const defaultLeagueConfig = {
     },
 
     // Reputationsänderung nach Elo-Prinzip (economy.js updateReputation).
-    // opponentReputation ist ein Platzhalter, solange es nur den festen
-    // KI-Gegner "Red AI" ohne eigenes Vereinsmodell gibt (echte Gegner/Liga
-    // erst Phase 3). prBonusPerLevel kommt vom Level der Öffentlichkeitsarbeit
+    // opponentReputation ist nur noch der Fallback ohne Liga-Kontext (z.B.
+    // sehr alter Spielstand ohne club.league) – der Normalfall zieht die
+    // feste Startreputation des tatsächlichen Liga-Gegners aus
+    // opponents.js/league.js (50/60/70/80/90 nach Stärke-Rang, siehe
+    // postMatch.js). prBonusPerLevel kommt vom Level der Öffentlichkeitsarbeit
     // und wirkt bewusst asymmetrisch (Nutzervorgabe: PR darf nie schaden) –
     // bei Sieg (1 + Level*Bonus) verstärkt den Gewinn, bei Niederlage
     // (1 - Level*Bonus) dämpft den Verlust, statt ihn wie ein reiner

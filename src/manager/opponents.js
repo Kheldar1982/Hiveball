@@ -14,6 +14,11 @@
 //     Lineman unbegrenzt; 5 Feldspieler.
 // Da Gegner keine EP-Ökonomie durchlaufen, stehen hier die Endwerte direkt –
 // die "implies"-Angabe je Team dokumentiert die dafür nötige Infrastruktur.
+//
+// startingReputation (Nutzervorgabe): feste Reputation je Gegner, aufsteigend
+// mit der Stärke-Leiter (50/60/70/80/90 für Rang 1-5) – ersetzt die bisher
+// fixe leagueConfig.js economy.reputation.opponentReputation als Grundlage
+// für economy.js updateReputation (siehe league.js opponentReputation()).
 
 import { POSITIONS_MANAGER_EXT } from './positions.js';
 
@@ -23,6 +28,7 @@ export const OPPONENT_TEAMS = [
     id: 'grasshoppers',
     name: 'Wiesen-Grashüpfer',
     rank: 1,
+    startingReputation: 50,
     style: 'Rookies – alles auf Grundwert, nur Startskills.',
     implies: 'TC1 / AC1',
     starters: [
@@ -41,6 +47,7 @@ export const OPPONENT_TEAMS = [
     id: 'cicadas',
     name: 'Grüne Zikaden',
     rank: 2,
+    startingReputation: 60,
     style: 'Solide, ausgeglichen – ein paar +1/+2, genau ein Zusatzskill.',
     implies: 'TC2 / AC1',
     starters: [
@@ -59,6 +66,7 @@ export const OPPONENT_TEAMS = [
     id: 'steelants',
     name: 'Stahl-Ameisen',
     rank: 3,
+    startingReputation: 70,
     style: 'Defensiv-Grinder – kein zerbrechlicher Fänger, dafür ein zäher Lineman.',
     implies: 'TC2 / AC2',
     starters: [
@@ -77,6 +85,7 @@ export const OPPONENT_TEAMS = [
     id: 'stormwasps',
     name: 'Sturm-Wespen',
     rank: 4,
+    startingReputation: 80,
     style: 'Schnell & aggressiv – zwei Läufer, viel AG, punktet blitzschnell, dünn in ST/BL.',
     implies: 'TC3 / AC2',
     starters: [
@@ -95,6 +104,7 @@ export const OPPONENT_TEAMS = [
     id: 'queensguard',
     name: 'Königinnengarde',
     rank: 5,
+    startingReputation: 90,
     style: 'Elite – Attribute auf Maximum (+3), 3 Skills; der Veteran-Kapitän dank Altersbonus sogar 4.',
     implies: 'TC3 / AC3 (Kapitän: + Altersbonus Veteran)',
     starters: [

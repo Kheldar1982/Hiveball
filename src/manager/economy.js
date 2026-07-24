@@ -97,9 +97,12 @@ export function payMatchIncome(club, won, config = defaultLeagueConfig) {
 }
 
 // Reputationsänderung nach Sieg/Niederlage (Elo-Prinzip): der Erwartungswert
-// ergibt sich aus der Differenz zur Gegner-Reputation (Platzhalter, siehe
-// leagueConfig.js – "Red AI" hat noch kein eigenes Vereinsmodell). Bewusst
-// wie an anderer Stelle im Kernspiel (siehe hiveball.html-Kommentar zum
+// ergibt sich aus der Differenz zur Gegner-Reputation. opponentReputation
+// kommt vom Aufrufer (postMatch.js, via league.js opponentReputation() – die
+// feste Startreputation des Liga-Gegners dieses Spieltags, siehe
+// opponents.js); ohne Liga-Kontext (Parameter weggelassen) greift der feste
+// Platzhalter config.economy.reputation.opponentReputation. Bewusst wie an
+// anderer Stelle im Kernspiel (siehe hiveball.html-Kommentar zum
 // Post-Match-Bildschirm) nur Sieg/Nicht-Sieg, kein eigenes
 // Unentschieden-Signal – das ist ein bestehender, bereits bekannter Gap,
 // kein neuer.
@@ -110,9 +113,9 @@ export function payMatchIncome(club, won, config = defaultLeagueConfig) {
 // Roh-Differenz auch Niederlagen zu vergrößern.
 // Reputation wird bei 1 nach unten gedeckelt, damit die Zuschauereinnahme
 // (die linear mit Reputation skaliert) nicht ins Negative/degenerieren kann.
-export function updateReputation(club, won, config = defaultLeagueConfig) {
+export function updateReputation(club, won, config = defaultLeagueConfig, opponentReputation = config.economy.reputation.opponentReputation) {
   const cfg = config.economy.reputation;
-  const expected = 1 / (1 + Math.pow(10, (cfg.opponentReputation - club.reputation) / cfg.eloScale));
+  const expected = 1 / (1 + Math.pow(10, (opponentReputation - club.reputation) / cfg.eloScale));
   const actual = won ? 1 : 0;
   const prBonus = cfg.prBonusPerLevel * club.facilities.publicRelations.level;
   const prMultiplier = won ? 1 + prBonus : 1 - prBonus;

@@ -46,6 +46,15 @@ export function opponentStars(id) {
   return team ? team.rank : 1;
 }
 
+// Feste Startreputation des Gegners (opponents.js startingReputation,
+// 50/60/70/80/90 nach Stärke-Rang) – Grundlage für economy.js
+// updateReputation() statt der bisherigen fixen 50 aus leagueConfig.js.
+// null bei unbekannter/keiner id, dann greift dort der leagueConfig-Fallback.
+export function opponentReputation(id) {
+  const team = getOpponentById(id);
+  return team ? team.startingReputation : null;
+}
+
 // ★ 1..5 für den eigenen Verein: auf derselben Leiter wie die Gegner – "so
 // stark wie N der fünf Gegner". Startkader (~Grashüpfer) => 1★, steigt sichtbar
 // mit Training.
