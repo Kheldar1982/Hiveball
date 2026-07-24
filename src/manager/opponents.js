@@ -19,6 +19,25 @@
 // mit der Stärke-Leiter (50/60/70/80/90 für Rang 1-5) – ersetzt die bisher
 // fixe leagueConfig.js economy.reputation.opponentReputation als Grundlage
 // für economy.js updateReputation (siehe league.js opponentReputation()).
+//
+// personality (Slice C, Nutzervorgabe): verhaltenssteuernde Parameter für die
+// KI in hiveball.html (aiTurn/computeAiPlan), alle 0..1:
+//   - ballHandlerPreference: wie stark Werfer/Fänger/Läufer statt "nächster
+//     Spieler" beim Aufnehmen eines losen Balls bevorzugt werden.
+//   - passWillingness: Wahrscheinlichkeit, dass der Ballträger den Ball statt
+//     selbst zu laufen an einen besser geeigneten Mitspieler weitergibt.
+//   - markingFocus: wie viele der nicht anderweitig gebundenen Spieler freie/
+//     gefährliche Blau-Spieler aktiv markieren statt pauschal vorzurücken;
+//     niedrig = eher geschlossen auf den Ballträger draufhauen ("Klump").
+//   - riskTolerance: 0.5 = unverändert die bisherigen festen Schwellen
+//     (Dodge-Abbruch bei <50%, Foul nur bei expectedDamage > catchChance) -
+//     siehe dodgeAbortThreshold()/foulRiskMargin() in hiveball.html.
+//   - cagePriority: Wahrscheinlichkeit, dass beim eigenen Ballträger gezielt
+//     die größte Bedrohung auf dessen Fluchtweg weggeblockt wird.
+// DEFAULT_AI_PERSONALITY (hiveball.html, für den Standalone-Fallback ohne
+// Verein/Liga) setzt alle Werte auf 0.5 und reproduziert damit exakt das
+// bisherige KI-Verhalten - Teams weichen davon gezielt nach ihrer Text-Flavor
+// oben ab (z.B. Stahl-Ameisen = "Klump"-Stil, Sturm-Wespen = Ballhandling-Fokus).
 
 import { POSITIONS_MANAGER_EXT } from './positions.js';
 
@@ -31,6 +50,10 @@ export const OPPONENT_TEAMS = [
     startingReputation: 50,
     style: 'Rookies – alles auf Grundwert, nur Startskills.',
     implies: 'TC1 / AC1',
+    // Rookies: keine besondere Disziplin, wenig Pass-/Markierungsspiel,
+    // Standard-Risiko - bewusst nah an DEFAULT_AI_PERSONALITY, nur etwas
+    // planloser (niedrigere ballHandlerPreference/markingFocus).
+    personality: { ballHandlerPreference: 0.4, passWillingness: 0.2, markingFocus: 0.3, riskTolerance: 0.5, cagePriority: 0.4 },
     starters: [
       { name: 'Klaus Halm',   position: 'Blocker', attrs: { bl: 5, st: 5, co: 5, ag: 2, pa: 3 }, skills: ['Block'] },
       { name: 'Bert Grün',    position: 'Blocker', attrs: { bl: 5, st: 5, co: 5, ag: 2, pa: 3 }, skills: ['Block'] },
@@ -50,6 +73,10 @@ export const OPPONENT_TEAMS = [
     startingReputation: 60,
     style: 'Solide, ausgeglichen – ein paar +1/+2, genau ein Zusatzskill.',
     implies: 'TC2 / AC1',
+    // Ausgeglichener Allrounder: exakt DEFAULT_AI_PERSONALITY (0.5 überall) -
+    // fungiert bewusst als die "Referenz"-KI, an der andere Teams sich
+    // erkennbar nach einer Richtung (Ballhandling vs. Klump) unterscheiden.
+    personality: { ballHandlerPreference: 0.5, passWillingness: 0.3, markingFocus: 0.5, riskTolerance: 0.5, cagePriority: 0.5 },
     starters: [
       { name: 'Manni Wall',     position: 'Blocker', attrs: { bl: 7, st: 6, co: 5, ag: 2, pa: 3 }, skills: ['Block', 'Robust'] },
       { name: 'Franz Bollwerk', position: 'Blocker', attrs: { bl: 6, st: 6, co: 5, ag: 2, pa: 3 }, skills: ['Block'] },
@@ -69,6 +96,11 @@ export const OPPONENT_TEAMS = [
     startingReputation: 70,
     style: 'Defensiv-Grinder – kein zerbrechlicher Fänger, dafür ein zäher Lineman.',
     implies: 'TC2 / AC2',
+    // "Klump"-Team (Nutzervorgabe): Ball ist sekundär, lieber gemeinsam auf
+    // den Ballträger drauf statt sauber zu markieren (niedriges markingFocus
+    // -> mehr Chaser statt Markierung, siehe computeAiPlan), hohe
+    // Risikobereitschaft beim Blocken/Foulen.
+    personality: { ballHandlerPreference: 0.3, passWillingness: 0.1, markingFocus: 0.25, riskTolerance: 0.75, cagePriority: 0.4 },
     starters: [
       { name: 'Egon Panzer', position: 'Blocker', attrs: { bl: 7, st: 7, co: 6, ag: 2, pa: 3 }, skills: ['Block', 'Robust', 'Rückendeckung'] },
       { name: 'Rolf Amboss',  position: 'Blocker', attrs: { bl: 7, st: 7, co: 5, ag: 3, pa: 3 }, skills: ['Block', 'Gewandt'] },
@@ -88,6 +120,10 @@ export const OPPONENT_TEAMS = [
     startingReputation: 80,
     style: 'Schnell & aggressiv – zwei Läufer, viel AG, punktet blitzschnell, dünn in ST/BL.',
     implies: 'TC3 / AC2',
+    // Ballhandling-Team (Nutzervorgabe): hoher Fokus darauf, den Ball beim
+    // best geeigneten Spieler zu halten und notfalls per Hand-off dorthin
+    // weiterzugeben, schützt den Ballträger konsequent (hohes cagePriority).
+    personality: { ballHandlerPreference: 0.85, passWillingness: 0.55, markingFocus: 0.6, riskTolerance: 0.6, cagePriority: 0.7 },
     starters: [
       { name: 'Max Brecher', position: 'Blocker', attrs: { bl: 8, st: 8, co: 6, ag: 2, pa: 3 }, skills: ['Block', 'Robust', 'Gewandt'] },
       { name: 'Jan Bombe',   position: 'Werfer',  attrs: { bl: 3, st: 3, co: 7, ag: 5, pa: 9 }, skills: ['Zielwurf', 'Ruhiger Kopf'] },
@@ -107,6 +143,10 @@ export const OPPONENT_TEAMS = [
     startingReputation: 90,
     style: 'Elite – Attribute auf Maximum (+3), 3 Skills; der Veteran-Kapitän dank Altersbonus sogar 4.',
     implies: 'TC3 / AC3 (Kapitän: + Altersbonus Veteran)',
+    // Elite: beherrscht beides auf hohem Niveau - diszipliniertes Markieren
+    // UND cleveres Ballhandling, kontrollierte statt rohe Aggression
+    // (riskTolerance nur leicht über Referenz, nicht auf "Klump"-Niveau).
+    personality: { ballHandlerPreference: 0.8, passWillingness: 0.5, markingFocus: 0.8, riskTolerance: 0.55, cagePriority: 0.85 },
     starters: [
       { name: 'Kapitän Godwin',   position: 'Blocker', attrs: { bl: 8, st: 8, co: 8, ag: 5, pa: 6 }, skills: ['Block', 'Robust', 'Rückendeckung', 'Gewandt', 'Hinterhältig'] },
       { name: 'Balthasar Wall',   position: 'Blocker', attrs: { bl: 8, st: 8, co: 7, ag: 4, pa: 3 }, skills: ['Block', 'Robust', 'Rückendeckung', 'Gewandt'] },
@@ -161,5 +201,6 @@ export function getOpponentRoster(id) {
     name: team.name,
     starters: team.starters.map(expandPlayer),
     bench: team.bench.map(expandPlayer),
+    personality: team.personality,
   };
 }

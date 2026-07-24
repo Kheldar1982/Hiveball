@@ -330,6 +330,26 @@ let players = [];
 // den Menschen (siehe startKickoff/showSubstitutionScreen).
 let benchPlayers = [];
 let ball = { x: 0, y: 0, carrierId: null };
+
+// KI-Persönlichkeit (Slice C, Nutzervorgabe): verhaltenssteuernde Parameter
+// für Rot, siehe opponents.js personality-Kommentar für die genaue Bedeutung
+// jedes Werts. 0.5 überall reproduziert exakt das bisherige KI-Verhalten
+// (siehe dodgeAbortThreshold/foulRiskMargin) - Standalone-Fallback ohne
+// Verein/Liga (setupTeams) nutzt deshalb bewusst diesen Default statt eigener
+// Werte. Wird in setupTeams() ggf. auf die personality des Liga-Gegners
+// gesetzt.
+const DEFAULT_AI_PERSONALITY = {
+  ballHandlerPreference: 0.5,
+  passWillingness: 0.3,
+  markingFocus: 0.5,
+  riskTolerance: 0.5,
+  cagePriority: 0.5,
+};
+let redPersonality = DEFAULT_AI_PERSONALITY;
+// Einmal pro Rot-Zug berechneter Team-Plan (siehe computeAiPlan/EINFACHE KI
+// weiter unten) - null außerhalb eines laufenden aiTurn()-Aufrufs.
+let aiPlan = null;
+
 let currentTeam = TEAM_BLUE;
 let selectedPlayerId = null;
 let passMode = false;
@@ -676,9 +696,11 @@ function setupTeams() {
     ys.forEach((y, i) => players.push(createPlayer(id++, i + 1, TEAM_RED, redRoster.starters[i].position, COLS - 3, y, redRoster.starters[i])));
     redRoster.bench.forEach(mp => benchPlayers.push({ team: TEAM_RED, position: mp.position, managerPlayer: mp }));
     teams[TEAM_RED].name = redRoster.name;
+    redPersonality = redRoster.personality || DEFAULT_AI_PERSONALITY;
   } else {
     ys.forEach((y, i) => players.push(createPlayer(id++, i + 1, TEAM_RED, TEAM_ROSTER[i], COLS - 3, y)));
     RED_BENCH_ROSTER.forEach(position => benchPlayers.push({ team: TEAM_RED, position, managerPlayer: null }));
+    redPersonality = DEFAULT_AI_PERSONALITY;
   }
 
   const redNameEl = document.getElementById('team-red-name');
@@ -2169,7 +2191,177 @@ function nearestFreeCellNear(targetX, targetY, fromX, fromY) {
   return best;
 }
 
+/* ------------------------------------------------------------
+   KI-TEAMPLAN (Slice C): computeAiPlan() läuft einmal pro Rot-Zug (siehe
+   aiTurn) und weist einzelnen Spielern konkrete Aufgaben zu - wer den losen
+   Ball holt, wer als Hand-off-Ziel taugt, wer den größten Weg-Blocker für
+   den eigenen Ballträger wegräumt, wer den gegnerischen Ballträger jagt und
+   wer welchen freien Blau-Spieler markiert. aiChooseDestination() konsultiert
+   diesen Plan; jeder Spieler OHNE Zuweisung fällt auf das unveränderte
+   Alt-Verhalten zurück (rein additiv, kein bestehender Pfad wird entfernt).
+   ------------------------------------------------------------ */
+
+// Bonus (in Feldern) beim Vergleich "wer sollte den Ball tragen" - Blocker/
+// Lineman sind reine Vollstrecker (0), Werfer/Läufer solide, Fänger (hohes AG,
+// meist bester Dodge-Wert) am geeignetsten. Skaliert mit
+// redPersonality.ballHandlerPreference (0 = reine Distanz wie vor Slice C).
+const ROLE_BALL_BONUS = { Lineman: 0, Blocker: 0, Werfer: 2, Fänger: 3, Läufer: 2 };
+
+// Gefahrenwert eines Blau-Spielers aus KI-Sicht fürs Markieren: Fänger/Läufer
+// als typische Anspielstationen am gefährlichsten, dazu Nähe zum (Blau-)
+// Ballträger, da ein Kurzpass in dessen Umfeld am leichtesten gelingt.
+function threatScore(blue, carrier) {
+  const posWeight = { Fänger: 3, Läufer: 2, Werfer: 1, Blocker: 0, Lineman: 0 }[blue.position] || 0;
+  const proximity = carrier ? Math.max(0, 6 - chebyshev(blue.x, blue.y, carrier.x, carrier.y)) : 0;
+  return posWeight + proximity * 0.5;
+}
+
+// Nächster noch nicht anderweitig verplanter Spieler aus 'pool' zu (x,y), oder
+// null falls der Pool leer ist. reserved wird direkt geprüft (nicht kopiert),
+// der Aufrufer trägt zugewiesene Spieler selbst ein.
+function nearestAvailable(pool, reserved, x, y) {
+  let best = null;
+  for (const p of pool) {
+    if (reserved.has(p.id)) continue;
+    const d = chebyshev(p.x, p.y, x, y);
+    if (!best || d < best.d) best = { d, player: p };
+  }
+  return best ? best.player : null;
+}
+
+// Weist bis zu maxMarkers Rot-Spielern aus redPool je einen unmarkierten
+// (keine Rot-Tacklezone auf ihm liegend) Blau-Spieler zu, priorisiert nach
+// threatScore. maxMarkers kommt aus redPersonality.markingFocus - je höher,
+// desto mehr sonst freie Spieler bekommen eine Markierungsaufgabe statt
+// pauschal vorzurücken. Gibt eine Map redPlayerId -> blueTargetId zurück.
+function computeMarkAssignments(redPool, maxMarkers, carrier) {
+  const assignments = new Map();
+  if (maxMarkers <= 0) return assignments;
+
+  const candidates = players
+    .filter(b => b.team === TEAM_BLUE && !b.prone && !b.injured && !(carrier && b.id === carrier.id))
+    .filter(b => !players.some(r => r.team === TEAM_RED && !r.prone && !r.injured && isAdjacent(r, b)))
+    .map(b => ({ b, score: threatScore(b, carrier) }))
+    .sort((x, y) => y.score - x.score);
+
+  const available = [...redPool];
+  for (const { b } of candidates) {
+    if (assignments.size >= maxMarkers || available.length === 0) break;
+    let bestIdx = -1, bestDist = Infinity;
+    available.forEach((p, i) => {
+      const d = chebyshev(p.x, p.y, b.x, b.y);
+      if (d < bestDist) { bestDist = d; bestIdx = i; }
+    });
+    if (bestIdx === -1) continue;
+    const [chosen] = available.splice(bestIdx, 1);
+    assignments.set(chosen.id, b.id);
+  }
+  return assignments;
+}
+
+// Bestes Hand-off-Ziel für den aktuellen Ballträger: ein Mitspieler mit
+// echt höherem ROLE_BALL_BONUS (kein Selbstzweck-Pass an einen gleichwertigen
+// Spieler), in sicherer Reichweite (<=6 Felder, analog "Langer Pass"/Bombe-
+// Grenze) und nicht bereits doppelt in gegnerischen Tacklezonen. null, wenn
+// keine klare Verbesserung existiert.
+function findBestHandoffTarget(carrier) {
+  const carrierBonus = ROLE_BALL_BONUS[carrier.position] || 0;
+  let best = null;
+  for (const p of players) {
+    if (p.team !== TEAM_RED || p.id === carrier.id || p.injured || p.prone) continue;
+    const bonus = ROLE_BALL_BONUS[p.position] || 0;
+    if (bonus <= carrierBonus) continue;
+    const fields = fieldsCrossed(carrier.x, carrier.y, p.x, p.y);
+    if (fields > 6) continue;
+    const tzTarget = countEnemyTackleZones(p.x, p.y, TEAM_RED);
+    if (tzTarget >= 2) continue;
+    const score = bonus - fields * 0.3 - tzTarget;
+    if (!best || score > best.score) best = { id: p.id, score };
+  }
+  return best ? best.id : null;
+}
+
+// Größte Bedrohung auf dem direkten Fluchtweg des eigenen Ballträgers (grobe
+// Näherung: ein freies Feld 2 Spalten in Laufrichtung voraus, analog zur
+// bisherigen Eskorten-Logik) - der Blau-Spieler, der dieses Feld am ehesten
+// noch erreichen und dort blocken könnte (Reichweite mr+1, wie
+// isThreatenedPosition an anderer Stelle bereits annimmt).
+function findBiggestCarrierThreat(carrier) {
+  const dir = teams[TEAM_RED].endzoneCol > carrier.x ? 1 : -1;
+  const aheadX = clamp(carrier.x + dir * 2, 0, COLS - 1);
+  let best = null;
+  for (const b of players) {
+    if (b.team !== TEAM_BLUE || b.prone || b.injured) continue;
+    const dist = chebyshev(b.x, b.y, aheadX, carrier.y);
+    const reach = b.mr + 1;
+    if (dist > reach) continue;
+    const score = reach - dist;
+    if (!best || score > best.score) best = { id: b.id, score };
+  }
+  return best ? best.id : null;
+}
+
+// Team-Plan für den kommenden Rot-Zug (siehe Kommentar-Block oben). Reihenfolge
+// der Reservierung spiegelt Dringlichkeit: eigener Ballträger > Ballaufnehmer >
+// Wegblocker für den Ballträger > Jäger des gegnerischen Ballträgers > Rest
+// als Markierungspool.
+function computeAiPlan() {
+  const redPlayers = players.filter(p => p.team === TEAM_RED && !p.injured);
+  const carrier = ball.carrierId !== null ? players.find(x => x.id === ball.carrierId) : null;
+  const weCarry = !!carrier && carrier.team === TEAM_RED;
+  const theyCarry = !!carrier && carrier.team === TEAM_BLUE;
+  const looseBall = ball.carrierId === null;
+
+  const reserved = new Set();
+  if (weCarry) reserved.add(carrier.id);
+
+  let retrieverId = null;
+  if (looseBall) {
+    let best = null;
+    for (const p of redPlayers) {
+      const bonus = redPersonality.ballHandlerPreference * (ROLE_BALL_BONUS[p.position] || 0);
+      const score = chebyshev(p.x, p.y, ball.x, ball.y) - bonus;
+      if (!best || score < best.score) best = { id: p.id, score };
+    }
+    if (best) { retrieverId = best.id; reserved.add(retrieverId); }
+  }
+
+  const passTargetId = weCarry ? findBestHandoffTarget(carrier) : null;
+
+  let cageBlockerId = null;
+  let cageTargetId = null;
+  if (weCarry && Math.random() < redPersonality.cagePriority) {
+    cageTargetId = findBiggestCarrierThreat(carrier);
+    if (cageTargetId) {
+      const threat = players.find(b => b.id === cageTargetId);
+      const candidate = nearestAvailable(redPlayers, reserved, threat.x, threat.y);
+      if (candidate) { cageBlockerId = candidate.id; reserved.add(cageBlockerId); }
+    }
+  }
+
+  const chaserIds = [];
+  if (theyCarry) {
+    // Niedriges markingFocus = "Klump"-Stil: lieber zu zweit auf den
+    // Ballträger drauf statt einen zweiten Spieler sauber markieren zu lassen.
+    const chaserCount = redPersonality.markingFocus < 0.4 ? 2 : 1;
+    for (let i = 0; i < chaserCount; i++) {
+      const c = nearestAvailable(redPlayers, reserved, carrier.x, carrier.y);
+      if (!c) break;
+      chaserIds.push(c.id);
+      reserved.add(c.id);
+    }
+  }
+
+  const markPool = redPlayers.filter(p => !reserved.has(p.id));
+  const maxMarkers = Math.round(redPersonality.markingFocus * markPool.length);
+  const markAssignments = computeMarkAssignments(markPool, maxMarkers, carrier);
+
+  return { weCarry, theyCarry, looseBall, carrier, retrieverId, passTargetId, cageBlockerId, cageTargetId, chaserIds, markAssignments };
+}
+
 function aiChooseDestination(p) {
+  const plan = aiPlan;
+
   if (ball.carrierId === p.id) {
     // Ziel-Spalte kann durch einen dort stehenden Spieler belegt sein -> nächstes freies
     // Feld in dieser Spalte in der Nähe der aktuellen Reihe suchen.
@@ -2177,26 +2369,65 @@ function aiChooseDestination(p) {
     if (!playerAt(goal.x, goal.y)) return goal;
     return nearestFreeCellNear(goal.x, goal.y, p.x, p.y) || goal;
   }
+
   if (ball.carrierId === null) {
-    return { x: ball.x, y: ball.y }; // Feld eines losen Balls ist per Spiellogik immer frei
+    if (plan && plan.retrieverId === p.id) {
+      return { x: ball.x, y: ball.y }; // Feld eines losen Balls ist per Spiellogik immer frei
+    }
+    if (plan) {
+      const markTargetId = plan.markAssignments.get(p.id);
+      const target = markTargetId && players.find(b => b.id === markTargetId);
+      if (target) return nearestFreeCellNear(target.x, target.y, p.x, p.y) || { x: target.x, y: target.y };
+    }
+    return { x: ball.x, y: ball.y }; // Fallback: unverändertes Alt-Verhalten
   }
+
   const carrier = players.find(x => x.id === ball.carrierId);
   if (carrier.team === TEAM_RED) {
+    if (plan && plan.cageBlockerId === p.id && plan.cageTargetId) {
+      const threat = players.find(b => b.id === plan.cageTargetId);
+      if (threat) return nearestFreeCellNear(threat.x, threat.y, p.x, p.y) || { x: threat.x, y: threat.y };
+    }
+    if (plan) {
+      const markTargetId = plan.markAssignments.get(p.id);
+      const target = markTargetId && players.find(b => b.id === markTargetId);
+      if (target) return nearestFreeCellNear(target.x, target.y, p.x, p.y) || { x: target.x, y: target.y };
+    }
     const dir = teams[TEAM_RED].endzoneCol > carrier.x ? 1 : -1;
     const x = clamp(carrier.x + dir * 3, 0, COLS - 1);
     const goal = { x, y: carrier.y };
     if (!playerAt(goal.x, goal.y)) return goal;
     return nearestFreeCellNear(goal.x, goal.y, p.x, p.y) || goal;
   }
-  // Gegnerischer Ballträger: dessen Feld selbst ist immer belegt -> das nächste freie
-  // Feld direkt daneben ansteuern, um ihn zu bedrängen/blocken.
+
+  // Gegnerischer Ballträger
+  if (plan) {
+    if (plan.chaserIds.includes(p.id)) {
+      return nearestFreeCellNear(carrier.x, carrier.y, p.x, p.y) || { x: carrier.x, y: carrier.y };
+    }
+    const markTargetId = plan.markAssignments.get(p.id);
+    const target = markTargetId && players.find(b => b.id === markTargetId);
+    if (target) return nearestFreeCellNear(target.x, target.y, p.x, p.y) || { x: target.x, y: target.y };
+  }
+  // Fallback: unverändertes Alt-Verhalten - direkt auf ihn zulaufen (bedrängen/blocken).
   return nearestFreeCellNear(carrier.x, carrier.y, p.x, p.y) || { x: carrier.x, y: carrier.y };
 }
 
+// Persönlichkeitsabhängige Risikoschwellen (Slice C, siehe opponents.js
+// personality-Kommentar). riskTolerance=0.5 reproduziert exakt die früheren
+// festen Werte (0.5 Dodge-Abbruch, Foul nur bei expectedDamage > catchChance),
+// damit DEFAULT_AI_PERSONALITY/der Standalone-Fallback unverändert bleiben.
+function dodgeAbortThreshold(personality) {
+  return 0.5 - (personality.riskTolerance - 0.5) * 0.4; // 0.7 (vorsichtig) .. 0.3 (riskant)
+}
+function foulRiskMargin(personality) {
+  return 1.5 - personality.riskTolerance; // 1.0 (vorsichtig) .. 0.5 (riskant)
+}
+
 // Ermittelt, ob ein Schritt von der aktuellen Position des Spielers nach (stepX,stepY)
-// riskant ist (irgendein Tackler mit Dodge-Erfolgschance < 50% für den Spieler).
+// riskant ist (irgendein Tackler mit Dodge-Erfolgschance < threshold für den Spieler).
 // Gibt den riskantesten Tackler zurück (niedrigste Erfolgschance) oder null, falls sicher.
-function findRiskiestTackle(p, stepX, stepY) {
+function findRiskiestTackle(p, stepX, stepY, threshold) {
   const tacklers = players.filter(e =>
     e.team !== p.team && !e.prone && !e.injured &&
     chebyshev(e.x, e.y, p.x, p.y) === 1
@@ -2210,7 +2441,7 @@ function findRiskiestTackle(p, stepX, stepY) {
     const dodgeChance = 1 - opposedChance(t.bl + bonus, p.ag); // Chance, dass DER SPIELER (Dodger) gewinnt
     if (!worst || dodgeChance < worst.dodgeChance) worst = { tackler: t, dodgeChance };
   });
-  return worst.dodgeChance < 0.5 ? worst : null;
+  return worst.dodgeChance < threshold ? worst : null;
 }
 
 // Sucht unter den direkt angrenzenden Gegnern denjenigen mit der besten Blockchance für p.
@@ -2315,7 +2546,7 @@ function aiAdvanceCarefully(p, destX, destY) {
     const usingExtraSquare = p.movesLeft <= 0;
     if (usingExtraSquare && (extraSquaresUsed >= extraBudget || !canAffordExtraSquare(p, extraSquaresUsed))) break;
 
-    const risk = findRiskiestTackle(p, step.x, step.y);
+    const risk = findRiskiestTackle(p, step.x, step.y, dodgeAbortThreshold(redPersonality));
     if (risk) {
       log(`#${p.number}: Dodge gegen #${risk.tackler.number} zu riskant (${Math.round(risk.dodgeChance * 100)}% Erfolgschance) – prüfe Alternativen.`);
 
@@ -2356,15 +2587,23 @@ function aiAdvanceCarefully(p, destX, destY) {
 }
 
 function aiTurn() {
+  // Team-Plan einmal pro Zug (siehe computeAiPlan): wer den losen Ball holt,
+  // Hand-off-Ziel, Wegblocker/Jäger/Markierungen. aiChooseDestination liest
+  // aiPlan direkt (Modul-State), daher hier nur einmal berechnen und setzen.
+  aiPlan = computeAiPlan();
+
   // Reihenfolge: eigener Ballträger zuerst (soll möglichst weit kommen, bevor sich das Feld
-  // durch die Bewegung der anderen verändert), danach die übrigen nach Nähe zum Ball.
-  // Liegende (nicht verletzte) Spieler werden mit aufgenommen – sie stehen gleich beim
-  // Aktivieren auf (kostet Bewegungspunkte, siehe standUpIfNeeded).
+  // durch die Bewegung der anderen verändert), danach der geplante Ballaufnehmer (Slice C:
+  // Rollen-gewichtet statt reiner Distanz, siehe computeAiPlan), danach die übrigen nach
+  // Nähe zum Ball. Liegende (nicht verletzte) Spieler werden mit aufgenommen – sie stehen
+  // gleich beim Aktivieren auf (kostet Bewegungspunkte, siehe standUpIfNeeded).
   const redPlayers = players
     .filter(p => p.team === TEAM_RED && !p.injured)
     .sort((a, b) => {
       if (ball.carrierId === a.id) return -1;
       if (ball.carrierId === b.id) return 1;
+      if (aiPlan.retrieverId === a.id) return -1;
+      if (aiPlan.retrieverId === b.id) return 1;
       return chebyshev(a.x, a.y, ball.x, ball.y) - chebyshev(b.x, b.y, ball.x, ball.y);
     });
 
@@ -2372,6 +2611,22 @@ function aiTurn() {
     if (gameEnded) return;
     if (p.injured) continue; // könnte inzwischen durch einen Tackle verletzt worden sein
     standUpIfNeeded(p);
+
+    // Hand-off (Slice C): trägt p den Ball und gibt es laut Plan einen klar
+    // besser geeigneten Mitspieler in sicherer Reichweite, wird zuerst ein
+    // Pass versucht statt blind Richtung Endzone zu laufen. passTargetId kann
+    // nach einem bereits erfolgreichen Hand-off in diesem Zug auf p selbst
+    // zeigen (der Plan wird nur einmal pro Zug berechnet) - der Selbstziel-
+    // Check verhindert einen sinnlosen Pass an sich selbst.
+    if (!p.acted && ball.carrierId === p.id && aiPlan.passTargetId && aiPlan.passTargetId !== p.id
+        && Math.random() < redPersonality.passWillingness) {
+      const target = players.find(x => x.id === aiPlan.passTargetId);
+      if (target) {
+        attemptPass(p, target);
+        if (gameEnded || currentTeam !== TEAM_RED) return; // Turnover beendet den Zug bereits (siehe attemptPass)
+        continue; // Pass gelungen: p hat gehandelt, weiter mit dem nächsten Spieler
+      }
+    }
 
     const dest = aiChooseDestination(p);
     if ((p.movesLeft > 0 || availableExtraSquares(p) > 0) && (p.x !== dest.x || p.y !== dest.y)) {
@@ -2391,14 +2646,15 @@ function aiTurn() {
     }
 
     // Foul versuchen, wenn ein liegender Gegner direkt angrenzt und sich das laut
-    // evaluateFoulOutcome lohnt: erwarteter Schaden > Entdeckungsrisiko. Nur ein Foul
-    // pro Zug erlaubt (foulUsedThisTurn), auch für die KI.
+    // evaluateFoulOutcome lohnt: erwarteter Schaden > Entdeckungsrisiko, skaliert
+    // über foulRiskMargin mit redPersonality.riskTolerance (Slice C). Nur ein
+    // Foul pro Zug erlaubt (foulUsedThisTurn), auch für die KI.
     if (!p.acted && !foulUsedThisTurn) {
       const proneAdjEnemies = players.filter(e => e.team === TEAM_BLUE && e.prone && !e.injured && isAdjacent(p, e));
       if (proneAdjEnemies.length) {
         const target = proneAdjEnemies.find(e => e.id === ball.carrierId) || proneAdjEnemies[0];
         const outcome = evaluateFoulOutcome(p, target);
-        if (outcome.expectedDamage > outcome.catchChance) {
+        if (outcome.expectedDamage > outcome.catchChance * foulRiskMargin(redPersonality)) {
           log(`#${p.number} erwägt ein Foul gegen #${target.number}: erwarteter Schaden ` +
             `${outcome.expectedDamage.toFixed(1)} vs. Entdeckungsrisiko ${Math.round(outcome.catchChance * 100)}% – lohnt sich.`);
           resolveFoul(p, target);
