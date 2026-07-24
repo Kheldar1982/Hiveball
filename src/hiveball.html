@@ -41,6 +41,10 @@
     width: 100%;
     max-width: 1100px;
     margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
   }
   #wrap {
     display: flex;
@@ -77,20 +81,27 @@
     flex-direction: column;
     gap: 10px;
   }
-  .score-row {
+  .header-names {
     display: flex;
-    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
     font-size: 1.1rem;
     font-weight: 600;
   }
-  .turns-row {
+  .header-score {
     display: flex;
-    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+  .header-turns {
+    display: flex;
+    gap: 20px;
     font-size: 0.75rem;
     color: #9fb0bd;
-    margin-top: -6px;
-    margin-bottom: 4px;
   }
+  .header-sep { color: #9fb0bd; }
   .team-blue { color: var(--blue); }
   .team-red { color: var(--red); }
   #log {
@@ -303,17 +314,19 @@
 </div>
 
 <div id="header-bar">
-  <div class="score-row">
+  <div class="header-names">
     <span class="team-blue" id="team-blue-name">Blau (Du)</span>
-    <span id="score-blue">0</span>
-  </div>
-  <div class="score-row">
+    <span class="header-sep">:</span>
     <span class="team-red" id="team-red-name">Rot (KI)</span>
-    <span id="score-red">0</span>
   </div>
-  <div class="turns-row">
-    <span id="turns-blue">Züge: 0/10</span>
-    <span id="turns-red">Züge: 0/10</span>
+  <div class="header-score">
+    <span class="team-blue" id="score-blue">0</span>
+    <span class="header-sep">:</span>
+    <span class="team-red" id="score-red">0</span>
+  </div>
+  <div class="header-turns">
+    <span class="team-blue" id="turns-blue">Züge: 0/10</span>
+    <span class="team-red" id="turns-red">Züge: 0/10</span>
   </div>
 </div>
 
