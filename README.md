@@ -41,10 +41,13 @@ ein Verein mit vollständiger Matchday-Nominierung (5 Feldspieler) in
 `localStorage`, spielt **Blau** mit dessen echten (trainierten/gealterten)
 Spielerwerten und Skills statt der festen Beispielaufstellung, inkl. Bank für
 Wechsel bei Verletzung/Platzverweis (gleiche Position → Lineman → beliebig
-verfügbar). **Rot** (KI) bleibt immer auf der festen Aufstellung "Option A"
-plus 2 Lineman auf der Bank – es gibt kein KI-Vereins-Datenmodell. Ohne
-Verein/ohne vollständige Nominierung bleibt das Kernspiel unverändert über die
-feste `TEAM_ROSTER` eigenständig spielbar (Fallback).
+verfügbar). **Rot** (KI) kam ursprünglich immer aus der festen Aufstellung
+"Option A" plus 2 Lineman auf der Bank; seit der Singleplayer-Liga (siehe
+unten) lädt Rot stattdessen den Gegner des aktuellen Liga-Spieltags aus
+`src/manager/opponents.js` – fünf datengetriebene KI-Vereine mit eigenen
+Namen/Werten/Skills/Persönlichkeit. Nur ohne Verein/ohne vollständige
+Nominierung bleibt das Kernspiel unverändert über die feste `TEAM_ROSTER`
+eigenständig spielbar (Fallback).
 
 Seit Phase 1h meldet `endGame()` außerdem für jeden Blau-Spieler mit
 Kaderanbindung SP-Endstand + Ausscheiden-Flag an `src/manager/injury.js`:
@@ -122,8 +125,10 @@ Einnahmen (nur Siegprämie) bei Weitem nicht – komplett neu aufgebaut:
   (reputationsabhängig, Levelbasis × Reputation/50), Catering (fester
   Prozentsatz der Zuschauereinnahme DIESES Matches, steigt pro Level).
 - **Reputation** ändert sich nach Sieg/Niederlage nach Elo-Prinzip (Erwartung
-  aus der Differenz zur – aktuell nur als Platzhalter existierenden –
-  Gegner-Reputation). Der PR-Bonus aus dem Öffentlichkeitsarbeit-Level wirkt
+  aus der Differenz zur Gegner-Reputation – seit der Singleplayer-Liga die
+  feste Startreputation des tatsächlichen Liga-Gegners dieses Spieltags,
+  50/60/70/80/90 nach Stärke-Rang, siehe unten; nur ohne Liga-Kontext greift
+  weiterhin ein fester Platzhalter). Der PR-Bonus aus dem Öffentlichkeitsarbeit-Level wirkt
   bewusst asymmetrisch: verstärkt den Gewinn bei Sieg, dämpft aber den
   Verlust bei Niederlage – kann also nie schaden.
 - **Sieben Gebäude** (`club.facilities`): Trainingscenter, Akademie,
@@ -166,7 +171,72 @@ Wichtiger Bugfix dabei: `endTurn()` darf erst laufen, **nachdem** der Kickoff
 Rot (KI) bereits während des offenen Wechselfensters unsichtbar auf
 veralteten (noch nicht zurückgesetzten) Positionen weiter.
 
-Zwei Teams: **Blau** (menschlich gesteuert) gegen **Rot** (einfache KI).
+**Singleplayer-Liga (Slice A+B, kein Teil des ursprünglichen Phasenplans –
+siehe `docs/hiveball_manager_spezifikation.md` Abschnitt 10).** Ersetzt den
+einen festen "Red AI"-Platzhalter durch eine 6-Team-Liga (der eigene Verein
+plus fünf datengetriebene KI-Gegner):
+
+- `src/manager/opponents.js`: fünf Gegnervereine als aufsteigende
+  Stärke-Leiter (Wiesen-Grashüpfer → Grüne Zikaden → Stahl-Ameisen →
+  Sturm-Wespen → Königinnengarde), jeder positionskonform und innerhalb der
+  Trainingscenter-/Akademie-Attributdecken, mit fester Startreputation
+  (50/60/70/80/90 nach Rang) sowie einer KI-`personality` (siehe Abschnitt 12).
+- `src/manager/league.js`: Einfachrunde über 5 Spieltage – der eigene Verein
+  trifft die Gegner in aufsteigender Reihenfolge; die je zwei übrigen
+  Begegnungen eines Spieltags werden über ein Stärke-Rating
+  (`rateRoster`/`rateOpponent`) abstrakt simuliert und beim Verbuchen des
+  eigenen Ergebnisses festgeschrieben (kein Neu-Würfeln bei Reload). Tabelle
+  mit 3/1/0 Punkten, Tie-Breaker TD-Differenz → TD erzielt →
+  Verletzungsdifferenz. `startNewSeason()` erzeugt einen neuen Spielplan bei
+  gleichbleibendem, weiterentwickeltem Kader.
+- Neue Seite `src/manager/league.html` (Nav-Punkt "Liga"): Reiter
+  Tabelle/Spielplan, Spieltag-Navigation, Saison-Abschluss +
+  "Neue Saison"-Button. `next-match.html` zeigt den Spielplan-Gegner samt
+  ★-Stärkeanzeige statt eines festen "Red AI"-Textes.
+- `hiveball.html` `setupTeams()` lädt Rot über `loadRedRosterFromLeague()`
+  aus dem aktuellen Liga-Spieltag (Fallback: feste `TEAM_ROSTER`, falls kein
+  Verein/keine Liga existiert); `processManagerPostMatch()` verbucht das
+  gespielte Ergebnis über `recordPlayerLeagueResult()` in die Liga.
+
+**Gegner-Startreputation:** `economy.js` `updateReputation()` nimmt seither
+einen optionalen `opponentReputation`-Parameter; `postMatch.js` zieht dafür
+den tatsächlichen Liga-Gegner des gerade gespielten Spieltags (noch vor dem
+Verbuchen des Liga-Ergebnisses) und übergibt dessen feste Startreputation
+statt des bisherigen festen Platzhalters. Ohne Liga-Kontext (z. B. sehr alte
+Spielstände) bleibt der alte Platzhalter als Fallback erhalten.
+
+**KI-Persönlichkeiten (Slice C) und Selbstspiel-Tuning** – siehe Abschnitt 12
+für die Verhaltenslogik und `scripts/tune-ai-personalities.mjs` für das
+Kalibrierungswerkzeug.
+
+**"Team löschen"** (Übersicht, Nutzeranfrage): roter Button in einer neuen
+"Gefahrenzone", öffnet ein Bestätigungs-Modal (kein natives `confirm()`, da
+eigene Button-Beschriftungen "Team löschen"/"Abbrechen" gefordert waren).
+`state.js` `deleteClub(clubId)` entfernt den Club-Datensatz sowie jeden
+Spieler mit dieser `clubId` – aktiver Kader **und** Hall-of-Fame-
+Ausgeschiedene, die nur noch über `clubId` auffindbar sind. `club.league`
+(Liga-/Saisonstand) lebt eingebettet im Club-Objekt und wird damit
+automatisch mitgelöscht; `leagueConfigOverrides` (globale Regel-
+Einstellungen) bleiben bewusst unangetastet, da sie keine Team-Eigenschaft
+sind. Nach dem Löschen Redirect auf `index.html`, das bei fehlendem Verein
+automatisch das bestehende "Verein gründen"-Formular zeigt.
+
+**Kernspiel-Oberfläche neu strukturiert** (Nutzeranfrage): statt einer
+einzigen Seitenleiste mit allem übereinander (Namen/Score/Züge, Status,
+Buttons, Hover-Vorschau, Log, komplette Regel-Legende) jetzt klar getrennte
+Bereiche – eine Header-Leiste oberhalb des Spielfelds mit drei zentrierten
+Zeilen (Teamnamen, Punkte, Zuganzeige, je durch ":" getrennt), rechts vom
+Spielfeld ein Spieler-Info-Panel für den aktivierten Spieler (Icon, Name,
+Position, Attribute, Skills als Badges mit Tooltip) mit den Aktions-Buttons
+darunter, das Log unterhalb von Spielfeld + Seitenpanel, und die komplette
+Regel-Legende als Hilfe-Overlay (Button "❓ Hilfe", schließbar über "OK")
+statt permanent sichtbarem Text. Nebenbei-Fix: `teams[TEAM_BLUE].name` wurde
+zuvor nie gesetzt (blieb immer beim Default "Blau") – zeigt jetzt analog zu
+Rot den echten Vereinsnamen, sobald ein Verein mit vollständiger
+Matchday-Nominierung existiert.
+
+Zwei Teams: **Blau** (menschlich gesteuert) gegen **Rot** (KI mit
+Team-Persönlichkeit, siehe Abschnitt 12).
 
 **Wichtig seit der Manager-Integration (ES-Module):** normale Browser
 (Chrome/Edge) blockieren `<script type="module">`-Importe über `file://`
@@ -481,43 +551,80 @@ schwerer als normal.
 
 ## 12. KI (Rot)
 
-- Nutzt dieselbe Bewegungslogik wie der Mensch (`findSmartPath`), volle
-  MR-Reichweite pro Zug.
-- Zielwahl (`aiChooseDestination`): eigener Ballträger → Richtung eigene
-  Endzone; loser Ball → hin zum Ball; Mitspieler trägt Ball → Eskorte-Position
-  vorauslaufen; Gegner trägt Ball → nächstes freies Feld neben ihm.
-- Risikobewusste Bewegung (`aiAdvanceCarefully`): vor jedem riskanten Schritt
-  (Dodge-Erfolgschance < 50%, Näherungsformel `opposedChance` = 50% +
-  Differenz/10) prüft die KI, ob ein Block gegen einen angrenzenden Gegner
-  eine bessere Chance bietet; sonst bricht sie die Bewegung lieber ab, statt
-  das Risiko einzugehen.
-- **Konservativer Einsatz von Extrafeldern** (`aiExtraSquareBudget`, siehe
-  Abschnitt 4 zu Extrafeldern): Die KI riskiert SP-Verlust und Sturz nur, wenn
-  sich dadurch ein klarer Vorteil ergibt, nicht um bloß die Distanz zu einem
-  Ziel zu verringern:
-  - als eigener Ballträger nur, um tatsächlich aus der Bedrohungsreichweite
-    eines Gegners zu entkommen (`isThreatenedPosition`, Näherung: gegnerische
-    MR + 1 Feld) – nicht für zusätzliche Vorwärtsbewegung, wenn schon sicher;
-  - gegen den gegnerischen Ballträger nur, wenn das tatsächlich in
-    Blockreichweite (angrenzend) bringt, nicht nur näher heran;
-  - bei einem losen Ball nur, wenn er dadurch in diesem Zug noch aufgenommen
-    werden kann;
-  - beim Eskortieren des eigenen Ballträgers werden grundsätzlich keine
-    Extrafelder eingesetzt (kein klarer Sofortvorteil definiert).
-  Genutzt wird dabei stets die minimal nötige Anzahl an Extrafeldern, nicht
-  automatisch das verfügbare Maximum.
-- KI passt **nicht** selbst (keine Wurf-Entscheidungslogik implementiert).
-- **Foul-Entscheidung** (`evaluateFoulOutcome`, siehe 7c): Grenzt ein liegender
-  blauer Gegner an und hat der Rot-Spieler noch keine Aktion in diesem Zug
-  ausgeführt, wird das Foul exakt bewertet – über alle 10×10 möglichen
-  Kombinationen aus Verletzungs- und Entdeckungswurf werden der erwartete
-  Schaden (SP-Verlust im Schnitt) und die Entdeckungswahrscheinlichkeit
-  berechnet. Die KI foult, wenn der erwartete Schaden das Entdeckungsrisiko
-  übersteigt (`expectedDamage > catchChance`, Schaden in SP-Punkten direkt
-  gegen die Wahrscheinlichkeit 0–1 verglichen – eine bewusst einfache
-  Heuristik statt einer echten Kosten-Nutzen-Umrechnung). Gibt es mehrere
-  liegende Gegner, hat der Ballträger Priorität (wie bei der Blockzielwahl).
-- Reihenfolge: eigener Ballträger zuerst, dann nach Nähe zum Ball sortiert.
+**Slice C (Nutzer-Feedback nach echten Liga-Partien) hat die KI von einer
+reinen Distanz-Heuristik zu einer team-planbasierten, persönlichkeits-
+gesteuerten Logik ausgebaut.** Die alte Version wählte den Ballaufnehmer rein
+über Distanz – bei der symmetrischen Kickoff-Formation ein reines
+Sortier-Artefakt (stabiler Sort ohne echten Tiebreak), das faktisch immer
+Blocker #1 losschickte, egal ob er der geeignete Ballträger war. Grundlage
+jetzt: `computeAiPlan(cageRoll)` in `hiveball.html`, einmal **pro
+Spieleraktivierung** neu berechnet (nicht nur einmal pro Zug – der Ballstatus
+kann sich mitten im Zug ändern, z. B. wenn der Ballaufnehmer den Ball noch
+während desselben Zuges sichert, siehe Bugfix unten), gelesen von
+`aiChooseDestination`.
+
+**KI-Persönlichkeit** (`redPersonality`, gesetzt in `setupTeams()` aus
+`opponents.js personality` bzw. `DEFAULT_AI_PERSONALITY` als Fallback ohne
+Verein/Liga – 0.5 überall reproduziert exakt das alte Verhalten): fünf
+Parameter 0..1, die dieselbe Plan-Logik team-spezifisch gewichten:
+
+| Parameter | Wirkung |
+|---|---|
+| `ballHandlerPreference` | Wie stark Werfer/Fänger/Läufer statt "nächster Spieler" beim Aufnehmen eines losen Balls bevorzugt werden (`ROLE_BALL_BONUS`). |
+| `passWillingness` | Wahrscheinlichkeit, dass der Ballträger den Ball per Hand-off-Pass an einen klar besser geeigneten Mitspieler weitergibt, statt selbst zu laufen (`findBestHandoffTarget`, nutzt das bereits vorhandene `attemptPass` – vorher nie von der KI aufgerufen). |
+| `markingFocus` | Wie viele sonst freie Spieler unmarkierte, gefährliche Blau-Spieler aktiv zustellen (`computeMarkAssignments`, Fänger/Läufer priorisiert) statt pauschal vorzurücken; niedrig = "Klump"-Stil (mehr Jäger auf den Ballträger statt sauberer Markierung). |
+| `riskTolerance` | Skaliert die früher festen Schwellen `dodgeAbortThreshold` (Dodge-Abbruch bei <50 %) und `foulRiskMargin` (Foul nur bei `expectedDamage > catchChance`) – 0.5 reproduziert exakt die alten Werte. |
+| `cagePriority` | Wahrscheinlichkeit, dass die größte Bedrohung auf dem Fluchtweg des eigenen Ballträgers gezielt weggeblockt wird (`findBiggestCarrierThreat`). |
+
+Team-Zuordnung passend zur Flavor aus `opponents.js` (siehe oben):
+Stahl-Ameisen = "Klump" (Ball sekundär, hohe Risikobereitschaft, kaum
+Markierung/Pass), Sturm-Wespen = Ballhandling-Fokus, Königinnengarde = beides
+auf hohem Niveau, Grüne Zikaden = Referenz-Baseline (0.5 überall), Wiesen-
+Grashüpfer etwas planloser. Vier der fünf Teams wurden zusätzlich per
+Offline-Selbstspiel gegeneinander kalibriert (`scripts/tune-ai-personalities.mjs`
+– Koordinaten-Aufstieg über ein vereinfachtes, separates Ballbesitz-Modell,
+nicht die exakte Feldgeometrie; siehe Kommentar am Dateianfang). Sturm-Wespen
+behielt bewusst die Handwerte, da die getunten Werte die Panel-Winrate
+gesenkt hätten.
+
+**Team-Plan pro Aktivierung** (`computeAiPlan`): weist konkrete Rollen zu,
+mit klarer Reservierungs-Reihenfolge – eigener Ballträger → Ballaufnehmer
+(rollen-gewichtet) → Wegblocker gegen die größte Bedrohung (`cageRoll` einmal
+pro Zug gewürfelt, nicht bei jedem Refresh neu, sonst würde die
+Käfig-Entscheidung mitten im Zug unmotiviert wechseln) → bis zu vier Eskorten
+auf unterschiedlichen Punkten rund um den Ballträger (`escortOffsets`: direkt
+voraus, schräg voraus beidseitig, Rückendeckung – **nicht** mehr alle auf
+demselben einzigen Punkt, siehe Bugfix unten) → Jäger des gegnerischen
+Ballträgers (1–2, mehr bei niedrigem `markingFocus`) → Rest als
+Markierungspool. Jeder Spieler ohne konkrete Zuweisung fällt auf das
+ursprüngliche Distanz-Verhalten zurück (rein additiv).
+
+**Zwei konkrete Bugs gefunden und gefixt** (Nutzer-Feedback nach gespielten
+Partien: "KI sichert den Ball nicht ab, Rest bleibt stehen" / "Deckung
+miserabel, Team klumpt geschlossen, Ballträger leicht umblitzt"):
+1. Der Plan wurde ursprünglich nur einmal zu Zugbeginn berechnet – für alle
+   *später* im selben Zug aktivierten Spieler blieb er auf dem veralteten
+   "Ball liegt frei"-Stand eingefroren, selbst nachdem der Ballaufnehmer (der
+   zuerst aktiviert wird) den Ball bereits gesichert hatte. Fix: Neuberechnung
+   bei jeder Spieleraktivierung.
+2. Alle Eskorten-Spieler zielten auf denselben einzigen Punkt (3 Felder
+   voraus, gleiche Reihe) statt sich zu verteilen. Fix: vier unterschiedliche
+   Eskorten-Punkte, siehe oben.
+
+- Nutzt weiterhin dieselbe Bewegungslogik wie der Mensch (`findSmartPath`),
+  volle MR-Reichweite pro Zug; risikobewusste Bewegung (`aiAdvanceCarefully`)
+  bricht vor riskanten Dodges lieber ab oder blockt stattdessen, Schwelle
+  jetzt über `riskTolerance` skaliert (siehe oben).
+- **Konservativer Einsatz von Extrafeldern** (`aiExtraSquareBudget`,
+  unverändert seit Slice C, siehe Abschnitt 4 zu Extrafeldern): nur bei
+  klarem Vorteil (aus Bedrohungsreichweite entkommen, Blockreichweite
+  tatsächlich erreichen, losen Ball tatsächlich noch aufnehmen), nie nur um
+  die Distanz zu verringern.
+- **KI passt jetzt selbst** – als Hand-off (siehe `passWillingness` oben),
+  nicht als eigenständige Wurf-Entscheidung während des Laufens.
+- **Foul-Entscheidung** (`evaluateFoulOutcome`, siehe 7c): unverändert die
+  Erwartungswert-Abwägung aus Schaden vs. Entdeckungsrisiko, jetzt zusätzlich
+  über `riskTolerance`/`foulRiskMargin` team-abhängig verschoben.
 
 ## 13. UI/UX-Konventionen
 
@@ -538,10 +645,19 @@ schwerer als normal.
   Verletzungen, Hall of Fame) und Phase 2 (Ökonomie-Redesign, sieben
   Gebäude, manuelle Wechselauswahl, neun neue Skills) sind vollständig
   umgesetzt (siehe Abschnitt 2 sowie `docs/hiveball_manager_spezifikation.md`
-  Abschnitt 10 für den detaillierten Phasenplan-Verlauf). Noch offen: die
-  Ausbaustufen aus Abschnitt 11 der Spezifikation (u.a. vollständige
-  Marktwert-Formel, Multi-Liga, Trainingsgebäude-Level 4-5, flexible
-  Startformationen) sind bewusst Phase 3.
+  Abschnitt 10 für den detaillierten Phasenplan-Verlauf). Die
+  Singleplayer-Liga (Slice A+B, fünf feste KI-Gegner + Spielplan/Tabelle,
+  siehe Abschnitt 2) ist **kein** Ersatz für die in Abschnitt 11 der
+  Spezifikation genannte "Multi-Liga mit echter Admin-Rolle" (echte
+  Online-Ligen gegen andere Menschen) – das bleibt weiterhin Phase 3, ebenso
+  wie vollständige Marktwert-Formel, Trainingsgebäude-Level 4-5, flexible
+  Startformationen und ein Balancing-Ventil gegen den Schneeball-Effekt.
+- **KI-Persönlichkeiten (Slice C)**: umgesetzt, siehe Abschnitt 12. Offener
+  Folgepunkt: `scripts/tune-ai-personalities.mjs` liefert Vorschläge aus
+  einem vereinfachten Selbstspiel-Modell, keine echte Simulation der realen
+  Feldgeometrie – bei künftigen Team-/Werte-Änderungen sollte erneut
+  gegengeprüft werden, ob die getunten Werte noch zur beabsichtigten
+  Team-Identität passen.
 - RW und SP fließen in den Verletzungscheck (siehe 7b) und in Extrafelder
   (siehe Abschnitt 4) ein. SP regeneriert bislang nur nach einem Touchdown
   (siehe Abschnitt 11, `regenerateStaminaAfterTouchdown`), sonst gibt es kein
@@ -556,7 +672,9 @@ schwerer als normal.
   Werfer hat weiterhin keinen eigenen **Start**-Skill (nur die drei anderen
   Positionen haben einen von Anfang an) – kann aber wie jede Position
   zusätzliche Skills über die Akademie erlernen.
-- KI wirft nicht selbst (keine Pass-Entscheidungslogik für Rot).
+- KI wirft nur als Hand-off an einen besser geeigneten Mitspieler (siehe
+  Abschnitt 12), nicht als eigenständige taktische Wurf-Entscheidung während
+  des Laufens (z. B. um eine Blockreichweite zu umgehen).
 - `sentOff` (siehe 7c) ist rein informativ und wird aktuell nirgends
   ausgewertet – vorgesehen für eine spätere Statistik/den Manager-Teil, um
   Platzverweise von echten Verletzungen unterscheiden zu können.
@@ -568,11 +686,13 @@ hiveball/
 ├── README.md                                   ← dieses Dokument
 ├── package.json                                ← nur für "npm run dev" (kein echtes npm-Projekt, keine Deps)
 ├── scripts/
-│   └── dev-server.mjs                          ← statischer Dev-Server (ohne ihn blockieren Browser die ES-Module über file://)
+│   ├── dev-server.mjs                          ← statischer Dev-Server (ohne ihn blockieren Browser die ES-Module über file://)
+│   └── tune-ai-personalities.mjs               ← Offline-Selbstspiel-Tuning der KI-Persönlichkeiten (Slice C, siehe Abschnitt 12)
 ├── src/
 │   ├── hiveball.html                           ← Kernspiel-Prototyp (HTML/CSS/JS, keine Deps)
 │   └── manager/                                ← Manager-Teil (Phase 1+2 abgeschlossen, siehe Spezifikation)
-│       ├── overview.html                       ← Übersicht (Kasse, Teamwert, Kadergröße, Gebäude-Level) – Startseite
+│       ├── overview.html                       ← Übersicht (Kasse, Teamwert, Kadergröße, Gebäude-Level, "Team löschen") – Startseite
+│       ├── league.html                         ← Liga: Tabelle/Spielplan-Reiter, Spieltag-Navigation, Saison-Abschluss
 │       ├── finances.html                       ← Finanzen: letzter Spieltag (tatsächlich) + nächster Spieltag (Vorschau)
 │       ├── next-match.html                     ← Matchday-Nominierung + Spielstart aus dem Manager heraus
 │       ├── index.html                          ← minimale Kader-UI (Verein anlegen, Spieler/Skills kaufen)
@@ -587,8 +707,10 @@ hiveball/
 │       ├── facilityUpgradeUI.js                ← gemeinsame Ausbau-Zeile (Icon/Level/Unterhalt/Button) für alle Gebäudeseiten
 │       ├── manager.css                         ← gemeinsames Stylesheet (Anthrazit-Theme)
 │       ├── leagueConfig.js                     ← Default-Konfiguration der Liga
+│       ├── opponents.js                        ← 5 datengetriebene KI-Gegnervereine + Persönlichkeit (Slice A+C)
+│       ├── league.js                           ← Singleplayer-Liga: Spielplan, Tabelle, Stärke-Rating, Saison (Slice B)
 │       ├── positions.js                        ← Positions-/Preistabelle inkl. Lineman
-│       ├── state.js                            ← Datenmodell (ManagerPlayer, Club) + Persistenz
+│       ├── state.js                            ← Datenmodell (ManagerPlayer, Club) + Persistenz + deleteClub()
 │       ├── formulas.js                         ← Formeln: Marktwert, Skill-Preis/-Limit, Reps-Schwelle/Maximalwert, Alter/Verfallschance
 │       ├── transferMarket.js                   ← einfacher Transfermarkt (Spieler kaufen)
 │       ├── economy.js                          ← Vereinskasse: Gehälter, Zuschauer/Sponsor/Fanshop/Catering-Einnahmen, Reputation (Elo), Gebäude-Ausbau/-Unterhalt, Vorschau-Berechnung

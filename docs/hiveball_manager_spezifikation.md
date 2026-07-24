@@ -158,7 +158,20 @@ erhalten und zählt sofort in Richtung des nächsten Punkts).
   // Phase 2: wirtschaftliche Zusammenfassung des zuletzt gespielten Matches
   // (siehe postMatch.js processPostMatch), Grundlage für finances.html.
   // null, solange noch kein Match gespielt wurde.
-  lastMatchEconomy: null
+  lastMatchEconomy: null,
+
+  // Singleplayer-Liga (Slice B, siehe Abschnitt 10) - lazy per ensureLeague()
+  // angelegt, lebt vollständig eingebettet im Club-Objekt (kein separater
+  // localStorage-Key, wird bei deleteClub() also automatisch mitgelöscht).
+  league: {
+    seasonNumber: 1,
+    currentMatchday: 0,             // Index in schedule, 0-basiert
+    seasonComplete: false,
+    teams: [ { id: "player" | "grasshoppers" | ..., name, isPlayer, rank } ],
+    schedule: [                     // 5 Spieltage, je 3 Begegnungen
+      [ { home: "player", away: "grasshoppers", result: null | { homeTd, awayTd, homeInj, awayInj } } ]
+    ]
+  }
 }
 ```
 
@@ -814,6 +827,148 @@ Hall of Fame einsortiert. Aktuelle Reihenfolge in `layout.js` `NAV_ITEMS`:
 Übersicht, Nächstes Spiel, Kader, Trainingscenter, Akademie, Stadion,
 Medizinische Abteilung, Öffentlichkeitsarbeit, Finanzen, Hall of Fame,
 Einstellungen.
+
+**Singleplayer-Liga: Slice A+B** (umgesetzt, kein Punkt im ursprünglichen
+Phasenplan – Nutzerentscheidung "Singleplayer-Tiefe zuerst" statt
+Multiplayer/Client-Server). **Wichtige Abgrenzung:** das ist **nicht** die in
+Phase 3 genannte "Multi-Liga mit echter Admin-Rolle" (echte Online-Ligen
+gegen andere Menschen, Server-Autorität nötig, siehe Abschnitt 9.3) – dieser
+Punkt bleibt weiterhin offen. Die Singleplayer-Liga ist rein clientseitig
+(eine lokale Instanz pro Browser) und ersetzt nur den einen festen "Red
+AI"-Platzhalter durch fünf feste, datengetriebene KI-Gegner:
+
+- **Slice A** – `src/manager/opponents.js`: fünf Gegnervereine als
+  aufsteigende Stärke-Leiter (Wiesen-Grashüpfer, Grüne Zikaden, Stahl-Ameisen,
+  Sturm-Wespen, Königinnengarde), jeder Spieler positionskonform und
+  innerhalb der Legalitätsregeln aus Abschnitt 1/3.2/3.4 (Attribut-
+  Obergrenze = Positions-Grundwert + Trainingscenter-Level, Zusatzskills ≤
+  Akademie-Level + Altersbonus). `getOpponentRoster(id)` expandiert einen
+  kompakten Team-Eintrag in genau die Objektform, die `hiveball.html`
+  `createPlayer` als `managerPlayer` erwartet – ersetzt den vorherigen festen
+  Fallback (`managerPlayer === null`, reine Positions-Grundwerte) mit echten
+  Namen/Werten.
+- **Slice B** – `src/manager/league.js`: Einfachrunde über 6 Teams (eigener
+  Verein + 5 Gegner), 5 Spieltage. Der Spielplan ist so aufgebaut
+  (Standard-Rundenturnier + Slot-Relabeling), dass der eigene Verein die
+  Gegner in aufsteigender Stärke trifft (Rang 1 an Spieltag 1 … Rang 5 an
+  Spieltag 5), während die übrigen vier parallel ihre eigenen Partien
+  bestreiten (vollständige Tabelle). `ratePlayer`/`rateRoster`
+  (Attributsumme + 3 je Skill, beste 5 Spieler) treiben sowohl die ★-Anzeige
+  als auch die abstrakte Simulation der zwei KI-gegen-KI-Begegnungen pro
+  Spieltag (Elo-artige Siegwahrscheinlichkeit aus dem Rating-Unterschied,
+  TD-/Verletzungs-Verteilung – bewusst kein Nachbau der echten Feldgeometrie).
+  `recordPlayerLeagueResult` trägt das echte, im Kernspiel gespielte Ergebnis
+  ein, simuliert die restlichen Begegnungen und schreibt sie fest (kein
+  Neu-Würfeln bei Reload). Tabelle: 3/1/0 Punkte, Tie-Breaker TD-Differenz →
+  TD erzielt → Verletzungsdifferenz (zugefügt − erlitten, höher = besser).
+  `startNewSeason()` erzeugt einen neuen Spielplan bei unverändert
+  weiterentwickeltem Kader. Neue Seite `league.html` (Nav "Liga"): Reiter
+  Tabelle/Spielplan, Spieltag-Navigation, Saison-Abschluss-Banner.
+  `next-match.html` zeigt den Spielplan-Gegner + ★-Stärke statt eines festen
+  Textes; `hiveball.html` `setupTeams()` baut Rot aus dem aktuellen
+  Liga-Gegner (`loadRedRosterFromLeague`, Fallback weiterhin `TEAM_ROSTER`).
+
+**Gegner-Startreputation** (umgesetzt, kleiner Folgepunkt zur Liga): jeder
+Gegner in `opponents.js` bekam eine feste `startingReputation`
+(50/60/70/80/90 nach Stärke-Rang). `league.js` `opponentReputation(id)` ist
+der Lookup dafür; `economy.js` `updateReputation()` nimmt einen optionalen
+`opponentReputation`-Parameter (Default weiterhin der alte feste
+`leagueConfig`-Platzhalter, für Aufrufer ohne Liga-Kontext unverändert).
+`postMatch.js` zieht dafür den tatsächlichen Liga-Gegner des gerade
+gespielten Spieltags (`currentOpponentId`, noch **vor**
+`recordPlayerLeagueResult` aufgerufen, damit der richtige, gerade gespielte
+Gegner ermittelt wird) und übergibt dessen Startreputation.
+
+**KI-Persönlichkeiten: Slice C** (umgesetzt, ausgelöst durch konkretes
+Nutzer-Feedback zur bisherigen KI: Ballaufnahme immer durch denselben
+Spieler unabhängig von Eignung, kein Passen, freie Gegner werden ignoriert,
+kein Offense-/Defense-Plan). Root-Cause der alten "immer Blocker #1 holt den
+Ball"-Beobachtung: bei der symmetrischen Kickoff-Formation waren alle
+Rot-Spieler exakt gleich weit vom Ball entfernt, ein stabiler Sort ohne
+echten Tiebreak entschied dann rein über die Array-Reihenfolge – kein
+Bug im eigentlichen Sinne, aber genau das hat der Nutzer zurecht bemängelt.
+
+`hiveball.html` bekam ein additives KI-Teamplan-System (`computeAiPlan`,
+neu berechnet bei **jeder** Spieleraktivierung – nicht nur einmal pro Zug,
+siehe Bugfix unten – gelesen von `aiChooseDestination`):
+- **Rollen-gewichtete Ballaufnahme** (`ROLE_BALL_BONUS`: Fänger > Werfer/
+  Läufer > Blocker/Lineman), skaliert über `redPersonality.ballHandlerPreference`.
+- **Hand-off-Pass** (`findBestHandoffTarget`) an einen klar besser
+  geeigneten Mitspieler in sicherer Reichweite, statt blind Richtung Endzone
+  zu laufen – nutzt das bereits vorhandene, bis dahin nie von der KI
+  aufgerufene `attemptPass()`. Wahrscheinlichkeit über `passWillingness`.
+- **Markieren unmarkierter, gefährlicher Blau-Spieler**
+  (`computeMarkAssignments`, Fänger/Läufer priorisiert, Nähe zum Ballträger),
+  Umfang über `markingFocus` (niedrig = "Klump"-Stil: mehr Jäger auf den
+  Ballträger statt sauberer Markierung, siehe `chaserIds`).
+- **Eskorten rund um den eigenen Ballträger** (`escortOffsets`: vier
+  unterschiedliche Punkte – direkt voraus, schräg voraus beidseitig,
+  Rückendeckung) statt der alten Eskorten-Logik, die alle Spieler auf
+  denselben einzigen Punkt schickte. Gezielter Wegblocker für die größte
+  Bedrohung auf dem Fluchtweg (`findBiggestCarrierThreat`,
+  `cagePriority`-Wahrscheinlichkeit).
+- Bisher feste Risikoschwellen (`dodgeAbortThreshold`, `foulRiskMargin`) sind
+  jetzt über `riskTolerance` team-abhängig; 0.5 reproduziert exakt die
+  alten festen Werte.
+
+Fünf `personality`-Parameter (0..1: `ballHandlerPreference`,
+`passWillingness`, `markingFocus`, `riskTolerance`, `cagePriority`) je Team
+in `opponents.js`, passend zur bestehenden Flavor: Stahl-Ameisen = "Klump"
+(Ball sekundär, hohe Risikobereitschaft), Sturm-Wespen = Ballhandling-Fokus,
+Königinnengarde = beides auf hohem Niveau, Grüne Zikaden = Referenz-Baseline
+(0.5 überall), Wiesen-Grashüpfer etwas planloser. `DEFAULT_AI_PERSONALITY`
+(0.5 überall, genutzt vom Standalone-Fallback ohne Verein/Liga) reproduziert
+exakt das Verhalten vor Slice C.
+
+**Zwei echte Bugs während des Live-Testens gefunden und gefixt** (nach einer
+vom Nutzer tatsächlich gespielten Liga-Runde): (1) der Plan wurde nur einmal
+zu Zugbeginn berechnet, bevor der zuerst aktivierte Ballaufnehmer den Ball
+überhaupt sicherte – alle später im selben Zug aktivierten Spieler handelten
+dadurch nach dem veralteten "Ball liegt frei"-Plan (liefen zu entfernten
+Blau-Spielern statt den neuen Ballträger zu decken). Fix: Neuberechnung bei
+jeder Spieleraktivierung; die Käfig-Zufallsentscheidung (`cageRoll`) wird
+trotzdem nur einmal pro Zug gewürfelt und durchgereicht, damit sie nicht bei
+jedem Refresh unmotiviert umspringt. (2) alle Eskorten-Spieler berechneten
+denselben einzigen Zielpunkt statt sich zu verteilen – Fix siehe
+`escortOffsets` oben.
+
+**Offline-Selbstspiel-Tuning** (`scripts/tune-ai-personalities.mjs`,
+Node-Bordmittel, keine Abhängigkeiten, analog zu `scripts/dev-server.mjs`):
+kalibriert die fünf `personality`-Werte gegeneinander per
+Koordinaten-Aufstieg (2 Ko-Adaptions-Durchgänge über alle Teams). **Bewusste
+Design-Entscheidung:** `aiTurn`/`computeAiPlan` headless lauffähig zu machen
+hätte eine große Entkopplung des DOM-gekoppelten Kernspiel-Regelkerns
+erfordert – genau der Schritt, den Abschnitt 8/9.3 bewusst zurückstellen, bis
+echter Multiplayer ihn nötig macht. Simuliert stattdessen ein separates,
+vereinfachtes Ballbesitz-Modell mit denselben Wirkrichtungen der fünf
+Parameter, aber ohne die exakte Feldgeometrie/Pfadsuche nachzubilden (Team-
+Stärke kommt echt aus `league.js` `rateRoster`). Schreibt nichts automatisch
+in `opponents.js`, gibt nur eine Vorher/Nachher-Vergleichstabelle aus.
+Ergebnis geprüft und teilweise übernommen: vier von fünf Teams bekamen die
+getunten Werte, Sturm-Wespen behielt die Handwerte (die Vorschläge hätten die
+Panel-Winrate gesenkt).
+
+**"Team löschen"** (Übersicht, Nutzeranfrage, kein Punkt im ursprünglichen
+Phasenplan): roter Button in einer neuen "Gefahrenzone", öffnet ein
+Bestätigungs-Modal mit exakt vorgegebenem Text und den Buttons "Team
+löschen"/"Abbrechen" (natives `confirm()` erlaubt keine eigenen
+Button-Beschriftungen). `state.js` `deleteClub(clubId)`: entfernt den
+Club-Datensatz sowie **jeden** Spieler mit dieser `clubId` – aktiver Kader
+**und** Hall-of-Fame-Ausgeschiedene, die nur noch über `clubId` auffindbar
+sind (gleiches Scan-Prinzip wie `loadRetiredPlayersForClub`, kein separater
+Index). `club.league` (Liga-/Saisonstand, siehe oben) lebt eingebettet im
+Club-Objekt und wird damit automatisch mitgelöscht.
+`leagueConfigOverrides` (globale Regel-Einstellungen, siehe Phase 1e) bleiben
+bewusst unangetastet – keine Team-spezifische Einstellung, soll auch für ein
+neu gegründetes Team weiter gelten. Nach der Löschung Redirect auf
+`index.html`, das bei fehlendem Verein automatisch das bestehende "Verein
+gründen"-Formular zeigt. **Echter Bug beim Bauen gefunden und gefixt:** die
+erste Version iterierte rückwärts über `localStorage.key(i)` und entfernte
+währenddessen Einträge – das ließ empirisch reproduzierbar einen
+Spieler-Datensatz übrig (`localStorage` garantiert keine stabile
+`key(i)`-Reihenfolge während gleichzeitiger Mutation). Fix: zweiphasiger
+Ansatz – erst alle zu löschenden Keys in einem reinen Lesedurchlauf sammeln,
+danach erst entfernen.
 
 **Phase 3** – Vollständige Marktwert-Formel, Multi-Liga mit echter
 Admin-Rolle und Persistenz pro Liga, Trainingsgebäude-Level 4-5, flexible
