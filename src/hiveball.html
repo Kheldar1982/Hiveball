@@ -2301,11 +2301,32 @@ function findBiggestCarrierThreat(carrier) {
   return best ? best.id : null;
 }
 
+// Eskorten-Zielpunkte relativ zum eigenen Ballträger (dir = Laufrichtung
+// Richtung eigene Endzone): direkt voraus, schräg voraus in beide Richtungen,
+// sowie Rückendeckung. Mehrere unterschiedliche Punkte statt eines einzigen
+// gemeinsamen Ziels (Nutzer-Feedback: "Rest steht schräg oberhalb geklumpt,
+// Ballträger lässt sich leicht umblitzen" - lag daran, dass ALLE Eskorten
+// bisher denselben einzigen Punkt anstrebten). Deckt so mehrere Seiten des
+// Ballträgers statt nur eine.
+function escortOffsets(dir) {
+  return [
+    { dx: dir * 3, dy: 0 },
+    { dx: dir * 2, dy: -1 },
+    { dx: dir * 2, dy: 1 },
+    { dx: -dir, dy: 0 },
+  ];
+}
+
 // Team-Plan für den kommenden Rot-Zug (siehe Kommentar-Block oben). Reihenfolge
 // der Reservierung spiegelt Dringlichkeit: eigener Ballträger > Ballaufnehmer >
-// Wegblocker für den Ballträger > Jäger des gegnerischen Ballträgers > Rest
-// als Markierungspool.
-function computeAiPlan() {
+// Wegblocker für den Ballträger > Eskorten rund um den Ballträger (mehrere
+// Zielpunkte) > Jäger des gegnerischen Ballträgers > Rest als Markierungspool.
+// cageRoll kommt von aiTurn (einmal pro Zug gewürfelt, siehe dortiger
+// Kommentar) statt bei jedem Aufruf neu zu würfeln - computeAiPlan() wird
+// innerhalb eines Zuges mehrfach neu aufgerufen (frischer Spielstand nach
+// jeder Spieleraktion), ein neuer Zufallswurf bei jedem Aufruf würde die
+// Käfig-Entscheidung mitten im Zug unnötig hin- und herspringen lassen.
+function computeAiPlan(cageRoll) {
   const redPlayers = players.filter(p => p.team === TEAM_RED && !p.injured);
   const carrier = ball.carrierId !== null ? players.find(x => x.id === ball.carrierId) : null;
   const weCarry = !!carrier && carrier.team === TEAM_RED;
@@ -2330,12 +2351,28 @@ function computeAiPlan() {
 
   let cageBlockerId = null;
   let cageTargetId = null;
-  if (weCarry && Math.random() < redPersonality.cagePriority) {
+  if (weCarry && cageRoll < redPersonality.cagePriority) {
     cageTargetId = findBiggestCarrierThreat(carrier);
     if (cageTargetId) {
       const threat = players.find(b => b.id === cageTargetId);
       const candidate = nearestAvailable(redPlayers, reserved, threat.x, threat.y);
       if (candidate) { cageBlockerId = candidate.id; reserved.add(cageBlockerId); }
+    }
+  }
+
+  // Eskorten rund um den Ballträger - VOR der Markierung reserviert, damit ein
+  // eigener Ballträger nicht durch zu viele Markierungsaufträge auf entfernte
+  // Blau-Spieler isoliert wird (siehe Nutzer-Feedback oben).
+  const escortAssignments = new Map();
+  if (weCarry) {
+    const dir = teams[TEAM_RED].endzoneCol > carrier.x ? 1 : -1;
+    for (const off of escortOffsets(dir)) {
+      const tx = clamp(carrier.x + off.dx, 0, COLS - 1);
+      const ty = clamp(carrier.y + off.dy, 0, ROWS - 1);
+      const candidate = nearestAvailable(redPlayers, reserved, tx, ty);
+      if (!candidate) break;
+      escortAssignments.set(candidate.id, { x: tx, y: ty });
+      reserved.add(candidate.id);
     }
   }
 
@@ -2356,7 +2393,7 @@ function computeAiPlan() {
   const maxMarkers = Math.round(redPersonality.markingFocus * markPool.length);
   const markAssignments = computeMarkAssignments(markPool, maxMarkers, carrier);
 
-  return { weCarry, theyCarry, looseBall, carrier, retrieverId, passTargetId, cageBlockerId, cageTargetId, chaserIds, markAssignments };
+  return { weCarry, theyCarry, looseBall, carrier, retrieverId, passTargetId, cageBlockerId, cageTargetId, escortAssignments, chaserIds, markAssignments };
 }
 
 function aiChooseDestination(p) {
@@ -2387,6 +2424,13 @@ function aiChooseDestination(p) {
     if (plan && plan.cageBlockerId === p.id && plan.cageTargetId) {
       const threat = players.find(b => b.id === plan.cageTargetId);
       if (threat) return nearestFreeCellNear(threat.x, threat.y, p.x, p.y) || { x: threat.x, y: threat.y };
+    }
+    if (plan) {
+      const escortTarget = plan.escortAssignments.get(p.id);
+      if (escortTarget) {
+        if (!playerAt(escortTarget.x, escortTarget.y)) return escortTarget;
+        return nearestFreeCellNear(escortTarget.x, escortTarget.y, p.x, p.y) || escortTarget;
+      }
     }
     if (plan) {
       const markTargetId = plan.markAssignments.get(p.id);
@@ -2587,10 +2631,22 @@ function aiAdvanceCarefully(p, destX, destY) {
 }
 
 function aiTurn() {
-  // Team-Plan einmal pro Zug (siehe computeAiPlan): wer den losen Ball holt,
-  // Hand-off-Ziel, Wegblocker/Jäger/Markierungen. aiChooseDestination liest
-  // aiPlan direkt (Modul-State), daher hier nur einmal berechnen und setzen.
-  aiPlan = computeAiPlan();
+  // Käfig-Entscheidung ("versuchen wir diesen Zug, den Ballträger gezielt zu
+  // schützen?") wird EINMAL pro Zug gewürfelt und an jeden computeAiPlan()-
+  // Aufruf durchgereicht - sonst würde ein Neu-Würfeln bei jedem Refresh
+  // (siehe unten) die Käfig-Zuweisung mitten im Zug unmotiviert wechseln.
+  const cageRoll = Math.random();
+
+  // Team-Plan (siehe computeAiPlan): wer den losen Ball holt, Hand-off-Ziel,
+  // Wegblocker/Eskorten/Jäger/Markierungen. Initial für die Sortierung unten
+  // (retrieverId), wird aber INNERHALB der Schleife für jeden Spieler neu
+  // berechnet (siehe dort) - der Ballstatus kann sich mitten im Zug ändern
+  // (z.B. sichert der Ballaufnehmer den Ball noch während dieses Zuges), ein
+  // nur einmal berechneter Plan würde die übrigen Spieler dann fälschlich
+  // weiter nach dem alten "Ball liegt frei"-Stand handeln lassen (Nutzer-
+  // Feedback: Restspieler bleiben nutzlos stehen bzw. laufen Gegnern
+  // hinterher statt den neuen Ballträger zu decken).
+  aiPlan = computeAiPlan(cageRoll);
 
   // Reihenfolge: eigener Ballträger zuerst (soll möglichst weit kommen, bevor sich das Feld
   // durch die Bewegung der anderen verändert), danach der geplante Ballaufnehmer (Slice C:
@@ -2612,12 +2668,15 @@ function aiTurn() {
     if (p.injured) continue; // könnte inzwischen durch einen Tackle verletzt worden sein
     standUpIfNeeded(p);
 
+    // Plan frisch neu berechnen (siehe Kommentar oben) - reflektiert den
+    // aktuellen Spielstand statt des Stands vom Zugbeginn.
+    aiPlan = computeAiPlan(cageRoll);
+
     // Hand-off (Slice C): trägt p den Ball und gibt es laut Plan einen klar
     // besser geeigneten Mitspieler in sicherer Reichweite, wird zuerst ein
-    // Pass versucht statt blind Richtung Endzone zu laufen. passTargetId kann
-    // nach einem bereits erfolgreichen Hand-off in diesem Zug auf p selbst
-    // zeigen (der Plan wird nur einmal pro Zug berechnet) - der Selbstziel-
-    // Check verhindert einen sinnlosen Pass an sich selbst.
+    // Pass versucht statt blind Richtung Endzone zu laufen. findBestHandoffTarget
+    // schließt den Träger selbst als Ziel schon aus; der Selbstziel-Check hier
+    // bleibt als zusätzliches Sicherheitsnetz.
     if (!p.acted && ball.carrierId === p.id && aiPlan.passTargetId && aiPlan.passTargetId !== p.id
         && Math.random() < redPersonality.passWillingness) {
       const target = players.find(x => x.id === aiPlan.passTargetId);
