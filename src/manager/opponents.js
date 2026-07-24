@@ -53,7 +53,9 @@ export const OPPONENT_TEAMS = [
     // Rookies: keine besondere Disziplin, wenig Pass-/Markierungsspiel,
     // Standard-Risiko - bewusst nah an DEFAULT_AI_PERSONALITY, nur etwas
     // planloser (niedrigere ballHandlerPreference/markingFocus).
-    personality: { ballHandlerPreference: 0.4, passWillingness: 0.2, markingFocus: 0.3, riskTolerance: 0.5, cagePriority: 0.4 },
+    // Werte kalibriert per scripts/tune-ai-personalities.mjs (2026-07-24,
+    // seed 20260724, Nutzer-Entscheidung: übernommen).
+    personality: { ballHandlerPreference: 0.4, passWillingness: 0.5, markingFocus: 0.45, riskTolerance: 0.5, cagePriority: 0.55 },
     starters: [
       { name: 'Klaus Halm',   position: 'Blocker', attrs: { bl: 5, st: 5, co: 5, ag: 2, pa: 3 }, skills: ['Block'] },
       { name: 'Bert Grün',    position: 'Blocker', attrs: { bl: 5, st: 5, co: 5, ag: 2, pa: 3 }, skills: ['Block'] },
@@ -76,7 +78,9 @@ export const OPPONENT_TEAMS = [
     // Ausgeglichener Allrounder: exakt DEFAULT_AI_PERSONALITY (0.5 überall) -
     // fungiert bewusst als die "Referenz"-KI, an der andere Teams sich
     // erkennbar nach einer Richtung (Ballhandling vs. Klump) unterscheiden.
-    personality: { ballHandlerPreference: 0.5, passWillingness: 0.3, markingFocus: 0.5, riskTolerance: 0.5, cagePriority: 0.5 },
+    // Werte kalibriert per scripts/tune-ai-personalities.mjs (2026-07-24,
+    // seed 20260724, Nutzer-Entscheidung: übernommen).
+    personality: { ballHandlerPreference: 0.65, passWillingness: 0.45, markingFocus: 0.65, riskTolerance: 0.44, cagePriority: 0.65 },
     starters: [
       { name: 'Manni Wall',     position: 'Blocker', attrs: { bl: 7, st: 6, co: 5, ag: 2, pa: 3 }, skills: ['Block', 'Robust'] },
       { name: 'Franz Bollwerk', position: 'Blocker', attrs: { bl: 6, st: 6, co: 5, ag: 2, pa: 3 }, skills: ['Block'] },
@@ -100,7 +104,11 @@ export const OPPONENT_TEAMS = [
     // den Ballträger drauf statt sauber zu markieren (niedriges markingFocus
     // -> mehr Chaser statt Markierung, siehe computeAiPlan), hohe
     // Risikobereitschaft beim Blocken/Foulen.
-    personality: { ballHandlerPreference: 0.3, passWillingness: 0.1, markingFocus: 0.25, riskTolerance: 0.75, cagePriority: 0.4 },
+    // Werte kalibriert per scripts/tune-ai-personalities.mjs (2026-07-24,
+    // seed 20260724, Nutzer-Entscheidung: übernommen) - riskTolerance/
+    // cagePriority liefen dabei an die Parametergrenze (1.0/0.0), was zur
+    // "Ball egal, Hauptsache draufhauen"-Identität passt.
+    personality: { ballHandlerPreference: 0.3, passWillingness: 0.4, markingFocus: 0.49, riskTolerance: 1.0, cagePriority: 0.0 },
     starters: [
       { name: 'Egon Panzer', position: 'Blocker', attrs: { bl: 7, st: 7, co: 6, ag: 2, pa: 3 }, skills: ['Block', 'Robust', 'Rückendeckung'] },
       { name: 'Rolf Amboss',  position: 'Blocker', attrs: { bl: 7, st: 7, co: 5, ag: 3, pa: 3 }, skills: ['Block', 'Gewandt'] },
@@ -123,6 +131,9 @@ export const OPPONENT_TEAMS = [
     // Ballhandling-Team (Nutzervorgabe): hoher Fokus darauf, den Ball beim
     // best geeigneten Spieler zu halten und notfalls per Hand-off dorthin
     // weiterzugeben, schützt den Ballträger konsequent (hohes cagePriority).
+    // scripts/tune-ai-personalities.mjs (2026-07-24) schlug hier eine
+    // Anpassung vor, die im Panel die Winrate leicht senkte (49.5%->48.3%) -
+    // Nutzer-Entscheidung: bewusst NICHT übernommen, Handwerte bleiben.
     personality: { ballHandlerPreference: 0.85, passWillingness: 0.55, markingFocus: 0.6, riskTolerance: 0.6, cagePriority: 0.7 },
     starters: [
       { name: 'Max Brecher', position: 'Blocker', attrs: { bl: 8, st: 8, co: 6, ag: 2, pa: 3 }, skills: ['Block', 'Robust', 'Gewandt'] },
@@ -146,7 +157,9 @@ export const OPPONENT_TEAMS = [
     // Elite: beherrscht beides auf hohem Niveau - diszipliniertes Markieren
     // UND cleveres Ballhandling, kontrollierte statt rohe Aggression
     // (riskTolerance nur leicht über Referenz, nicht auf "Klump"-Niveau).
-    personality: { ballHandlerPreference: 0.8, passWillingness: 0.5, markingFocus: 0.8, riskTolerance: 0.55, cagePriority: 0.85 },
+    // Werte kalibriert per scripts/tune-ai-personalities.mjs (2026-07-24,
+    // seed 20260724, Nutzer-Entscheidung: übernommen).
+    personality: { ballHandlerPreference: 0.65, passWillingness: 0.65, markingFocus: 0.8, riskTolerance: 0.25, cagePriority: 0.85 },
     starters: [
       { name: 'Kapitän Godwin',   position: 'Blocker', attrs: { bl: 8, st: 8, co: 8, ag: 5, pa: 6 }, skills: ['Block', 'Robust', 'Rückendeckung', 'Gewandt', 'Hinterhältig'] },
       { name: 'Balthasar Wall',   position: 'Blocker', attrs: { bl: 8, st: 8, co: 7, ag: 4, pa: 3 }, skills: ['Block', 'Robust', 'Rückendeckung', 'Gewandt'] },

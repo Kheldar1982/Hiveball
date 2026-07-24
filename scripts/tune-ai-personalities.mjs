@@ -271,3 +271,11 @@ for (const team of OPPONENT_TEAMS) {
 
 console.log('Hinweis: Werte sind Vorschläge aus dem vereinfachten Modell (siehe Kommentar');
 console.log('am Dateianfang) - vor einer Übernahme in opponents.js gegenprüfen.');
+
+// Maschinenlesbare Vollpräzisions-Werte (die Tabelle oben rundet auf 2
+// Nachkommastellen) - zum direkten Übernehmen einzelner Teams in opponents.js,
+// ohne die Rundung der Konsolenausgabe mitzuschleppen.
+console.log('\n=== Vollpräzision (zum Kopieren) ===');
+for (const team of OPPONENT_TEAMS) {
+  console.log(`${team.id}: ${JSON.stringify(tuned[team.id])}`);
+}
