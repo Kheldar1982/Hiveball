@@ -217,6 +217,43 @@ td.num, th.num { text-align: right; }
 .stars { color: var(--accent); letter-spacing: 1px; }
 .strength-line { color: var(--text-muted); font-size: 0.9rem; margin: 0.3rem 0 0.8rem; }
 
+/* Übersicht: "Team löschen" + Bestätigungs-Modal */
+.btn-danger {
+  background: #7a1f1f;
+  color: #fff;
+  border-color: #7a1f1f;
+}
+.btn-danger:hover { border-color: #a52a2a; cursor: pointer; }
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 100;
+}
+/* Muss explizit gegen die display:flex-Regel oben antreten (gleiche
+   Spezifität wie ein Attribut-Selektor schlägt die UA-Regel [hidden]{display:none}
+   nicht automatisch) - siehe gleiches Muster/Lehre bei hiveball.html #postgame-overlay. */
+.modal-overlay[hidden] { display: none; }
+
+.modal-box {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.2rem 1.5rem;
+  max-width: 420px;
+  margin: 1rem;
+}
+.modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  justify-content: flex-end;
+}
+
 /* Finanzen-Seite: zwei Spalten (letzter Spieltag / Vorschau nächster Spieltag) */
 .finance-columns { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-start; }
 .finance-column {

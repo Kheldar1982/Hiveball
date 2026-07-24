@@ -232,6 +232,34 @@ export function loadRetiredPlayersForClub(clubId) {
   return results;
 }
 
+// Löscht einen Verein vollständig, "als hätte er nie existiert" (Nutzervorgabe,
+// Übersicht "Team löschen"): den Club-Datensatz selbst sowie JEDEN Spieler mit
+// diesem clubId - aktiver Kader UND Hall-of-Fame-Ausgeschiedene, die nur noch
+// über clubId auffindbar sind (siehe loadRetiredPlayersForClub, gleiches
+// Scan-Prinzip, kein separater Index). club.league (Liga-/Saisonstand) lebt
+// eingebettet im Club-Objekt selbst und wird damit automatisch mitgelöscht -
+// kein separater Aufräumschritt nötig. leagueConfigOverrides (globale
+// Regel-Einstellungen in leagueConfig.js) bleiben bewusst unangetastet: das
+// ist keine Team-spezifische Einstellung, sondern eine App-weite Präferenz,
+// die auch für ein neu gegründetes Team weiterhin gelten soll.
+// Erst ALLE zu löschenden Keys in einem reinen Lesedurchlauf sammeln, danach
+// erst entfernen - localStorage garantiert keine stabile key(i)-Reihenfolge
+// während gleichzeitig Einträge entfernt werden (auch rückwärts iteriert kann
+// das Einträge überspringen, empirisch beobachtet), ein zweiphasiger Ansatz
+// umgeht das vollständig.
+export function deleteClub(clubId) {
+  localStorage.removeItem(clubKey(clubId));
+
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith(playerKey(''))) continue;
+    const player = JSON.parse(localStorage.getItem(key));
+    if (player.clubId === clubId) keysToRemove.push(key);
+  }
+  keysToRemove.forEach((key) => localStorage.removeItem(key));
+}
+
 // Manuelle Sicherung: bündelt Club + kompletten Kader in eine JSON-Datei und
 // stößt den Browser-Download an.
 export function exportSaveToFile(club) {
