@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hiveball – Rulebook</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 780px; margin: 3rem auto; padding: 0 1rem; line-height: 1.55; color: #1a1a1a; }
+  h1 { margin-bottom: 0.1rem; }
+  h1 + p.subtitle { color: #555; margin-top: 0; font-size: 1.05rem; }
+  p.stand { color: #777; font-size: 0.85rem; }
+  h2 { margin-top: 2.5rem; padding-top: 0.5rem; border-top: 2px solid #ddd; }
+  h3 { margin-top: 1.5rem; }
+  a { color: #0a58ca; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.92rem; }
+  th, td { border: 1px solid #ccc; padding: 0.4rem 0.6rem; text-align: left; }
+  th { background: #f0f0f0; }
+  dt { font-weight: bold; margin-top: 0.9rem; }
+  dd { margin-left: 0; color: #333; }
+  .hint { background: #eef4ff; border-left: 4px solid #0a58ca; padding: 0.6rem 1rem; margin: 1rem 0; }
+  .toc { background: #f7f7f7; border: 1px solid #ddd; padding: 1rem 1.5rem; }
+  .toc h2 { margin-top: 0; border-top: none; }
+  .toc ol { margin: 0; padding-left: 1.3rem; }
+  .toc li { margin-bottom: 0.15rem; }
+  .part-label { color: #0a58ca; font-weight: bold; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.05em; }
+  code { background: #f0f0f0; padding: 0.1rem 0.3rem; border-radius: 3px; }
+  @media print {
+    a { color: inherit; text-decoration: none; }
+    .no-print { display: none; }
+    h2 { border-top: none; }
+  }
+</style>
+</head>
+<body>
+
+<p class="no-print"><a href="../index.html">&larr; Back to homepage</a> · <a href="einsteiger-en.html">Never seen Blood Bowl/football before? Start here</a> · <a href="spielanleitung.html">🇩🇪 Deutsche Version</a></p>
+
+<h1>🏈 Hiveball – Rulebook</h1>
+<p class="subtitle">A turn-based 5-a-side football tactics game with club manager and singleplayer league</p>
+<p class="stand">As of: July 2026 – fully covers the core game and the manager part.</p>
+
+<div class="toc">
+<h2>Contents</h2>
+<p class="part-label">Part 1 – The core game</p>
+<ol>
+  <li><a href="#was-ist-hiveball">What is Hiveball?</a></li>
+  <li><a href="#spielfeld-teams">Field &amp; Teams</a></li>
+  <li><a href="#positionen">Positions</a></li>
+  <li><a href="#attribute">Attributes in detail</a></li>
+  <li><a href="#ausruestung">Equipment</a></li>
+  <li><a href="#wuerfel">The dice system (D10)</a></li>
+  <li><a href="#zugablauf">How a turn works</a></li>
+  <li><a href="#bewegung">Movement &amp; tackle zones</a></li>
+  <li><a href="#blocken">Blocking</a></li>
+  <li><a href="#verletzungen">Injuries: Armor &amp; Stamina</a></li>
+  <li><a href="#foul">Fouling</a></li>
+  <li><a href="#passen">Passing &amp; catching</a></li>
+  <li><a href="#skills">Skills</a></li>
+  <li><a href="#spielende">End of game &amp; victory</a></li>
+  <li><a href="#kurzreferenz-kernspiel">Core game quick reference</a></li>
+</ol>
+<p class="part-label">Part 2 – The manager</p>
+<ol start="16">
+  <li><a href="#manager-ueberblick">Overview: what does the manager do?</a></li>
+  <li><a href="#verein-kader">Founding a club &amp; roster</a></li>
+  <li><a href="#transfermarkt">Transfer market</a></li>
+  <li><a href="#nominierung">Matchday nomination</a></li>
+  <li><a href="#training">Training: training centre &amp; academy</a></li>
+  <li><a href="#alterung">Aging &amp; end of career</a></li>
+  <li><a href="#medizin">Injuries &amp; medical department</a></li>
+  <li><a href="#oekonomie">Club economy</a></li>
+  <li><a href="#gebaeude">The seven facilities</a></li>
+  <li><a href="#liga">The league</a></li>
+  <li><a href="#gegner">Opponent clubs &amp; AI personalities</a></li>
+  <li><a href="#nach-dem-spiel">After the match &amp; settings</a></li>
+  <li><a href="#ausblick">Current state &amp; outlook</a></li>
+</ol>
+</div>
+
+<h2 id="was-ist-hiveball">1. What is Hiveball?</h2>
+<p>Hiveball is a turn-based tactics game for two teams of 5 players, loosely inspired by American football board games, but with its own independent rules: its own attribute names, a D10 (ten-sided die) instead of the usual D6, and a few original mechanics such as the zone bonus on tackles or the distance-based pass difficulty.</p>
+<p>Goal of the game: score more touchdowns than your opponent by getting the ball into their endzone.</p>
+<p>The game consists of two parts: the <strong>core game</strong> (the actual match, Part 1 of this rulebook) and the <strong>manager</strong> (club administration between matches: roster, training, economy, league – Part 2). The two are connected: if you've set up a club in the manager with a complete matchday nomination, the core game uses exactly those players with their trained stats and skills against your current league opponent. Without a club, the core game remains playable on its own with a fixed sample lineup.</p>
+<div class="hint">All save data (clubs, rosters, league, settings) is stored exclusively locally in your browser (<code>localStorage</code>). There is no account, no server, and no online multiplayer mode – every browser/device has its own, independent save.</div>
+
+<h3>The core game interface</h3>
+<p>Above the field, a header bar shows the team names, the score, and the turn count. To the right of the field, a player info panel appears for the currently selected player (attributes, skills, action buttons), with the game log below it. The complete rules legend is available at any time as an overlay via the <strong>"❓ Help"</strong> button, instead of being permanently on screen.</p>
+
+<h2 id="spielfeld-teams">2. Field &amp; Teams</h2>
+<p>The field is a grid of 13 columns × 7 rows. Each team has an endzone at one end of the field:</p>
+<ul>
+  <li>Team <strong>Blue</strong> (controlled by you) starts on the left and attacks to the right – the right-hand column is Blue's endzone.</li>
+  <li>Team <strong>Red</strong> (computer AI, your league opponent) starts on the right and attacks to the left.</li>
+</ul>
+<p>Each team consists of 5 field players. Every player wears a jersey number from 1–5. At the start of the game, both teams each roll a D10 – whoever rolls higher goes first (ties are re-rolled).</p>
+
+<h2 id="positionen">3. Positions</h2>
+<p>Each position has its own profile of strengths and weaknesses, recognizable by its icon on the field. The standard lineup ("Option A") consists of 2× Blocker, 1× Thrower, 1× Catcher, 1× Runner.</p>
+<table>
+<tr><th>Icon</th><th>Position</th><th>Strengths</th><th>Role on the team</th></tr>
+<tr><td>🛡️ (2×)</td><td>Blocker</td><td>Block, Strength, Toughness</td><td>Clears opponents out of the way, protects the ball carrier</td></tr>
+<tr><td>🎯</td><td>Thrower</td><td>Pass accuracy</td><td>Throws the ball to teammates</td></tr>
+<tr><td>🙌</td><td>Catcher</td><td>Pickup/catching</td><td>Catches passes, brings the ball to the goal</td></tr>
+<tr><td>🏃</td><td>Runner</td><td>Movement, agility</td><td>Fast across the field, ball carrier</td></tr>
+<tr><td>🧑</td><td>Lineman</td><td>no particular strength/weakness</td><td>Cheap roster filler, see below</td></tr>
+</table>
+<p>The <strong>Lineman</strong> is a sixth position, available only in the manager part: solid average stats with no standout highs or lows, no starting skill, and considerably cheaper to buy than the four specialist positions (see section 18). Clubs sign linemen via the transfer market to have enough bench cover for emergencies (injuries, ejections during a match) without having to buy multiples of the pricier specialist positions. Unlike Blocker/Thrower/Catcher/Runner, there's no upper limit on how many linemen a roster can hold at once.</p>
+
+<h2 id="attribute">4. Attributes in detail</h2>
+<p>Every player has six base stats plus two derived stats. Higher is always better for every stat.</p>
+<table>
+<tr><th>Abbr.</th><th>Name</th><th>Meaning</th></tr>
+<tr><td>MR</td><td>Movement Range</td><td>How many squares the player can normally move per turn</td></tr>
+<tr><td>BL</td><td>Block</td><td>Strength in direct duels (blocking/tackling)</td></tr>
+<tr><td>ST</td><td>Strength</td><td>How much damage the player deals when winning a duel</td></tr>
+<tr><td>CO</td><td>Constitution</td><td>Basis for armor and stamina (see below)</td></tr>
+<tr><td>AG</td><td>Agility</td><td>Catching, ball pickup, dodging, extra squares</td></tr>
+<tr><td>PA</td><td>Pass accuracy</td><td>How reliably the player throws</td></tr>
+<tr><td>RW</td><td>Armor</td><td>Resistance to injury (CO + equipment bonus)</td></tr>
+<tr><td>SP</td><td>Stamina Points</td><td>"Hit points" – if they drop to 0, the player is injured and out</td></tr>
+</table>
+
+<h3>Stats by position (incl. standard equipment)</h3>
+<table>
+<tr><th>Position</th><th>MR</th><th>BL</th><th>ST</th><th>CO</th><th>RW</th><th>SP</th><th>AG</th><th>PA</th></tr>
+<tr><td>Blocker</td><td>4</td><td>5</td><td>5</td><td>5</td><td>8</td><td>15</td><td>2</td><td>3</td></tr>
+<tr><td>Runner</td><td>6</td><td>3</td><td>3</td><td>3</td><td>6</td><td>9</td><td>6</td><td>5</td></tr>
+<tr><td>Catcher</td><td>6</td><td>2</td><td>2</td><td>3</td><td>6</td><td>9</td><td>7</td><td>6</td></tr>
+<tr><td>Thrower</td><td>5</td><td>3</td><td>3</td><td>4</td><td>7</td><td>12</td><td>4</td><td>6</td></tr>
+<tr><td>Lineman</td><td>5</td><td>3</td><td>3</td><td>3</td><td>6</td><td>9</td><td>3</td><td>3</td></tr>
+</table>
+<p>Standing up from the ground costs 2 movement points (MR) – a fallen player can't get back up for free.</p>
+
+<h2 id="ausruestung">5. Equipment</h2>
+<p>Every player wears four pieces of equipment. Currently every player has the same standard equipment – different variants with their own pros and cons are planned for the future.</p>
+<table>
+<tr><th>Slot</th><th>Current effect</th><th>Planned for the future</th></tr>
+<tr><td>Body armor</td><td>+3 to armor (RW)</td><td>Lighter/heavier variants: more RW, but e.g. less MR</td></tr>
+<tr><td>Boots</td><td>no effect</td><td>MR bonus, sure footing on extra squares, foul bonuses</td></tr>
+<tr><td>Helmet</td><td>no effect</td><td>Protection from critical hits, extra stamina</td></tr>
+<tr><td>Gloves</td><td>no effect</td><td>Bonuses when catching, throwing, or blocking</td></tr>
+</table>
+<p>The RW values in the table in section 4 already include the standard body armor bonus.</p>
+
+<h2 id="wuerfel">6. The dice system (D10)</h2>
+<p>Almost every action in Hiveball is decided with a ten-sided die (D10).</p>
+<ul>
+  <li>A rolled <strong>10</strong> is always a success – in duels, even an automatic win, regardless of the stats involved.</li>
+  <li>A rolled <strong>1</strong> is always a failure – in duels, an automatic loss.</li>
+  <li><strong>Target-number rolls</strong> (e.g. catching, passing): roll + own attribute must meet or beat a target number.</li>
+  <li><strong>Opposed rolls</strong> (e.g. block, tackle): both sides roll, whoever has the higher total (roll + attribute + bonuses) wins.</li>
+</ul>
+
+<h2 id="zugablauf">7. How a turn works</h2>
+<p>Teams alternate whole turns. Within its own turn, a team can move multiple players, but each player may only take one active action per turn:</p>
+<ul>
+  <li><strong>Move</strong> – up to MR squares (plus optionally extra squares, see section 8)</li>
+  <li><strong>Block</strong> – against an adjacent, standing opponent (section 9)</li>
+  <li><strong>Pass</strong> – throw the ball to a teammate (section 12)</li>
+  <li><strong>Foul</strong> – against an adjacent, downed opponent (section 11), at most once per turn for the whole team</li>
+</ul>
+<p>A turn ends when the player clicks "End turn" or when all players have acted.</p>
+
+<h2 id="bewegung">8. Movement &amp; tackle zones</h2>
+<h3>Tackle zones</h3>
+<p>Every standing (not downed) player controls the 8 squares around them – their tackle zone. Inside an opposing tackle zone, catching, throwing, and picking up the ball are each made 1 harder per opposing zone.</p>
+<h3>Tackle while leaving (Dodge)</h3>
+<p>If a player (the Dodger) leaves an opponent's tackle zone (the Tackler), the Tackler may attempt a tackle: the Tackler's BL against the Dodger's AG.</p>
+<ul>
+  <li>If the Dodger stays within the same tackle zone while doing so, the Tackler gets +1 on their roll.</li>
+  <li>If the Tackler wins: the Dodger falls at their starting position and undergoes an injury check (section 10). The move is aborted.</li>
+  <li>If the Tackler rolls a natural 1: they botch the tackle and fall themselves (with their own injury risk).</li>
+</ul>
+<h3>Extra squares</h3>
+<p>Once a player's regular MR is used up, they can move up to 2 additional squares. Each extra square costs 1 SP (stamina) and requires an agility roll (D10 + AG) against a target of 10. On a failure, the player falls at their current position and loses an additional 1 SP (2 SP total for this square) – a carried ball falls to the ground in the process.</p>
+
+<h2 id="blocken">9. Blocking</h2>
+<p>A block is an active action against a directly adjacent, standing opponent: a BL duel, the loser falls and undergoes an injury check (section 10).</p>
+<h3>Assists</h3>
+<p>Teammates standing in the target's tackle zone (but not in any other opposing zone themselves) add half their BL value (rounded down) to their teammate's block roll. This applies to both sides simultaneously.</p>
+<h3>Movement penalty</h3>
+<p>A block after prior movement in the same turn is harder: for every 2 MR already used (started), the blocker's (not the target's) BL drops by 1. Standing up counts toward this too.</p>
+<div class="hint">Example: a Blocker with BL 5 has already used 3 of their 4 MR this turn. 3 rounded up to steps of 2 = 2 steps → −2 to BL, so effectively BL 3 for this block.</div>
+
+<h2 id="verletzungen">10. Injuries: Armor &amp; Stamina</h2>
+<p>An injury check follows every lost block or tackle:</p>
+<ol>
+  <li>The winner rolls D10 + their own ST.</li>
+  <li>The loser's Armor (RW) is subtracted from that. If the result is negative, the hit deals no damage.</li>
+  <li>The remaining difference is subtracted from the loser's SP (Stamina Points).</li>
+</ol>
+<div class="hint">Result: if SP drops to 0 or below, the player is injured and out for the rest of the game. If SP stays above 0, the player is merely down and can stand back up normally (costs 2 MR).</div>
+<p>SP is also consumed by extra squares (section 8) and fouls (section 11). So far, SP is only regenerated after a scored touchdown (section 14) – all players with SP above 0 recover by their CO value at that point, capped at their starting value.</p>
+
+<h2 id="foul">11. Fouling</h2>
+<p>A standing player who hasn't acted yet this turn can foul an adjacent, downed opponent. This counts as their action for the turn. Only one foul is allowed per turn for the entire team – no matter how many players are still free.</p>
+<ol>
+  <li><strong>Injury check:</strong> exactly as in section 10 – D10 + the fouler's ST against the victim's RW, the difference costs their SP.</li>
+  <li><strong>Detection roll:</strong> the fouler's AG against a target of 5, made harder by half the damage dealt. On success, the foul goes unnoticed. On failure, the fouler is sent off and is also out (without losing SP themselves).</li>
+</ol>
+<div class="hint">Tactical note: a Blocker (high ST, low AG) deals a lot of damage when fouling but gets caught more often. A Catcher or Runner (high AG, low ST) fouls with lower risk but less effect. The <strong>Sneaky</strong> skill lowers the detection target by 1 for specialized players.</div>
+
+<h2 id="passen">12. Passing &amp; catching</h2>
+<ul>
+  <li>Maximum pass distance: 9 squares (diagonal steps count slightly more than straight steps).</li>
+  <li>Target number for the throw: 5 + distance covered (rounded up), further increased by the thrower's own tackle-zone pressure.</li>
+  <li>Distance classification: up to 3 squares = short pass, up to 6 squares = long pass, beyond that = bomb.</li>
+  <li>A successful throw is followed by a catch attempt: target number 8 + the catcher's tackle zones.</li>
+  <li>Downed players can neither catch nor be chosen as a pass target.</li>
+</ul>
+<h3>Picking up the ball &amp; scatter</h3>
+<p>Picking up a loose ball requires a roll against target 8 (+ tackle zones). On failure, it's a turnover, and the ball scatters randomly across the 8 neighboring squares until it's either caught or comes to rest in the open (catch attempt there: target 9, i.e. 1 harder than normal).</p>
+
+<h2 id="skills">13. Skills</h2>
+<p>Every position comes with a fixed starting skill from the outset (except Lineman). All further skills are learned in the manager part via the academy in exchange for EP (section 20) – a player isn't limited to the "typical" skills of their position.</p>
+<table>
+<tr><th>Skill</th><th>Starting skill of</th><th>Effect</th></tr>
+<tr><td>Blitz</td><td>Runner</td><td>No movement penalty when blocking, no matter how much MR has already been used.</td></tr>
+<tr><td>Block</td><td>Blocker</td><td>+1 to the block roll, for both the blocker and the target. If both have the skill, the bonuses cancel out; if only one has it, they automatically win on a tie.</td></tr>
+<tr><td>Dodge</td><td>Catcher</td><td>When blocked, this player rolls AG instead of BL. If they win, the attacker doesn't fall (unless they roll a natural 1).</td></tr>
+<tr><td>Accurate Throw</td><td>–</td><td>+1 to the throw roll when passing.</td></tr>
+<tr><td>Cool Head</td><td>–</td><td>Ignores opposing tackle zones when passing or catching (no penalty).</td></tr>
+<tr><td>Guard</td><td>–</td><td>Supports a block even from a second opposing tackle zone, then with +1 instead of half BL.</td></tr>
+<tr><td>Sure Hands</td><td>–</td><td>+1 when picking the ball up off the ground.</td></tr>
+<tr><td>Tough</td><td>–</td><td>−1 damage (minimum 0) on an injury check as the loser.</td></tr>
+<tr><td>Nimble</td><td>–</td><td>+1 to the dodge roll (AG side) on a tackle.</td></tr>
+<tr><td>Second Wind</td><td>–</td><td>The first extra square of a move costs no stamina.</td></tr>
+<tr><td>Sure Footed</td><td>–</td><td>+1 to the success roll when taking an extra square.</td></tr>
+<tr><td>Sneaky</td><td>–</td><td>−1 to the detection target when fouling.</td></tr>
+<tr><td>Sponsor</td><td>–</td><td>Purely economic, no in-match effect: converts this player's salary into an equal amount of sponsor income for the club.</td></tr>
+</table>
+<div class="hint">Throwers signed through the manager start with the <strong>Accurate Throw</strong> skill. The core game's fixed sample lineup (without a club), however, still has no thrower starting skill.</div>
+
+<h2 id="spielende">14. End of game &amp; victory</h2>
+<ul>
+  <li>Immediate win at 3 touchdowns.</li>
+  <li>Otherwise, the game ends after 10 turns per team – whoever has more touchdowns then wins. A tie is a draw.</li>
+  <li>After every touchdown: score +1, all players return to their starting positions, the ball goes to the center of the field, and the turn automatically switches to the other team.</li>
+</ul>
+
+<h2 id="kurzreferenz-kernspiel">15. Core game quick reference</h2>
+<table>
+<tr><th>Action</th><th>Target / mechanic</th></tr>
+<tr><td>Picking up the ball</td><td>D10 + AG ≥ 8 (+ tackle zones)</td></tr>
+<tr><td>Catching (after a pass)</td><td>D10 + AG ≥ 8 (+ tackle zones)</td></tr>
+<tr><td>Catching (from scatter)</td><td>D10 + AG ≥ 9 (+ tackle zones)</td></tr>
+<tr><td>Throwing</td><td>D10 + PA ≥ 5 + distance (+ tackle zones)</td></tr>
+<tr><td>Extra square</td><td>D10 + AG ≥ 10, costs 1 SP (2 SP on failure)</td></tr>
+<tr><td>Block / Tackle</td><td>D10 + BL (or AG for Dodge) – higher total wins</td></tr>
+<tr><td>Injury check</td><td>(D10 + winner's ST) − loser's RW = SP damage</td></tr>
+<tr><td>Foul detection</td><td>D10 + AG ≥ 5 + half the damage dealt</td></tr>
+<tr><td>Standing up</td><td>costs 2 MR</td></tr>
+</table>
+
+<h2 id="manager-ueberblick">16. Overview: what does the manager do?</h2>
+<p>The manager part (<code>src/manager/</code>) is club administration between matches: building a roster, training players, keeping an eye on the club's finances, upgrading facilities, and playing a season in the league. You reach it via <code>src/manager/index.html</code> (the roster page, also the starting point for founding a club). From there, a shared navigation bar leads to all the other manager pages. Just like the core game, everything runs entirely in the browser, with no server – a club is tied to the browser it was created in.</p>
+
+<h2 id="verein-kader">17. Founding a club &amp; roster</h2>
+<p>The first time you open the roster page without an existing club, Hiveball shows a form for founding a new club. Every new club starts with <strong>€200,000</strong> in capital and the seven facilities at their respective starting level (see section 24).</p>
+<ul>
+  <li>Maximum roster size: <strong>12 players</strong>.</li>
+  <li>Of the specialist positions (Blocker/Thrower/Catcher/Runner), at most <strong>2</strong> of each may be nominated to "Field" for a given matchday – this limit doesn't apply to Linemen.</li>
+  <li>The overview page (<code>overview.html</code>) shows your finances, team value, and roster size at a glance, plus the level of every facility.</li>
+  <li>In the "danger zone" of the same page, you can permanently delete your club via the <strong>"Delete team"</strong> button (with a confirmation dialog) – this removes the entire roster including Hall of Fame entries and this club's league/season standing. Global settings (section 27) are unaffected.</li>
+</ul>
+
+<h2 id="transfermarkt">18. Transfer market</h2>
+<p>You buy new players via the transfer market at their position's base price:</p>
+<table>
+<tr><th>Position</th><th>Base price</th></tr>
+<tr><td>Lineman</td><td>€30,000</td></tr>
+<tr><td>Blocker</td><td>€50,000</td></tr>
+<tr><td>Thrower</td><td>€55,000</td></tr>
+<tr><td>Catcher</td><td>€60,000</td></tr>
+<tr><td>Runner</td><td>€65,000</td></tr>
+</table>
+<p>The actual <strong>market value</strong> of an already-developed player rises above the base price: +€2,500 per attribute point above the position's base stats, +€10,000 per additionally learned skill. This market value is also the basis for salary calculations (section 22).</p>
+
+<h2 id="nominierung">19. Matchday nomination</h2>
+<p>Before every league match, you decide who plays on <code>next-match.html</code>. Every roster player gets one of three statuses:</p>
+<dl>
+  <dt>Field</dt>
+  <dd>The 5 active starting players for the upcoming match.</dd>
+  <dt>Bench</dt>
+  <dd>Up to 3 substitutes who come on during the match if a field player is injured or sent off (same position preferred, then Lineman, then whoever is available).</dd>
+  <dt>Unused</dt>
+  <dd>Not nominated, won't play in this match – only costs the lowest salary rate.</dd>
+</dl>
+<p>At most 8 players can be nominated per matchday (5 field + 3 bench). If substitutes run out on the bench during the match, your team knowingly continues playing short-handed.</p>
+
+<h2 id="training">20. Training: training centre &amp; academy</h2>
+<p>Players don't improve automatically, but through two separate systems:</p>
+<h3>Reps &amp; physical training (training centre)</h3>
+<p>During a match, every player with a roster link accumulates so-called <strong>reps</strong> on their attributes (e.g. BL on every block attempt, AG on ball pickup/catch, PA on a successful pass), capped at a maximum of 4 per attribute per game. On <code>training.html</code>, accumulated reps are actually converted into attribute points using free training centre slots. The training centre level determines both the number of slots per cycle (level 1: 3, level 2: 5, level 3: 7 including double training) and the cap for each attribute (position base value + level, excluding MR – MR is fixed by position and can't be trained).</p>
+<h3>Skills &amp; theory training (academy)</h3>
+<p>Additional skills are bought with EP (experience points) on <code>academy.html</code> and trained via free academy slots. Every player earns EP from their match performance: participation 3, touchdown 8, successful pass 3, catch 3, won block 3, tackle survived 2, win bonus 5, MVP bonus 6, plus small bonuses for bomb passes and blocks against a stronger opponent (underdog). The academy level limits how many additional skills (beyond the starting skill) a player can learn at once: level 1 → 1, level 2 → 2, level 3 → 3, plus one further bonus skill in the Veteran/Elder age phases (section 21). Each additional skill costs more than the previous one (×1.5 / ×2 / ×2.5 multiplier).</p>
+<table>
+<tr><th>Skill</th><th>EP cost</th></tr>
+<tr><td>Blitz / Block / Accurate Throw / Sure Footed / Sure Hands</td><td>100</td></tr>
+<tr><td>Guard / Second Wind / Sneaky</td><td>110</td></tr>
+<tr><td>Cool Head / Sponsor / Tough / Nimble</td><td>125</td></tr>
+<tr><td>Dodge</td><td>150</td></tr>
+</table>
+
+<h2 id="alterung">21. Aging &amp; end of career</h2>
+<p>Players start at age 20 and go through an aging cycle every 6 matches played (real league matches count the same as the "Simulate matches" debug button):</p>
+<table>
+<tr><th>Phase</th><th>up to age</th><th>Training speed</th><th>Decline chance</th></tr>
+<tr><td>Talent</td><td>23</td><td>×0.7 (slower)</td><td>0%</td></tr>
+<tr><td>Peak</td><td>29</td><td>×1.0</td><td>0%</td></tr>
+<tr><td>Veteran</td><td>32</td><td>×1.0</td><td>20%</td></tr>
+<tr><td>Elder</td><td>35</td><td>×1.5 (faster)</td><td>40%</td></tr>
+<tr><td>End of career</td><td>37</td><td>–</td><td>100%</td></tr>
+</table>
+<p>"Decline chance" means: per aging cycle, the player may lose attribute points instead of training. From age <strong>38</strong> onward, a player is forced into retirement. A well-developed medical department delays and softens this decline (see section 22). If a player retires through forced retirement, their record is kept with full stats and reason for leaving in the <strong>Hall of Fame</strong> (<code>hall-of-fame.html</code>).</p>
+
+<h2 id="medizin">22. Injuries &amp; medical department</h2>
+<p>If a player is injured and out during a match (SP at 0 or below, see section 10), the manager then rolls for injury severity:</p>
+<table>
+<tr><th>Severity</th><th>Time out</th><th>Attribute-loss risk</th></tr>
+<tr><td>Bruised</td><td>0 matches</td><td>–</td></tr>
+<tr><td>Knocked about</td><td>1 match</td><td>–</td></tr>
+<tr><td>Injured</td><td>2 matches</td><td>–</td></tr>
+<tr><td>Badly injured</td><td>3–5 matches</td><td>20%</td></tr>
+<tr><td>Severe injury</td><td>6–9 matches</td><td>100%, plus 8% forced retirement</td></tr>
+</table>
+<p>Every injured player heals passively by 1 match of time-out per match played. If additionally assigned manually to a treatment slot (<code>medical.html</code>), they heal instead with a higher, level-dependent reduction (level 1: 2, level 2: 3, level 3: 4 per match) and are automatically discharged once fully healed. The number of simultaneous treatment slots matches the medical department's level (1/2/3).</p>
+
+<h2 id="oekonomie">23. Club economy</h2>
+<h3>Expenses</h3>
+<p>Salaries are calculated based on the player's actual role in that specific match (not just the pre-match nomination) – a player substituted in during the match already pays the field rate:</p>
+<ul>
+  <li>Field: 10% of market value</li>
+  <li>Bench: 5% of market value</li>
+  <li>Unused: 2% of market value</li>
+</ul>
+<p>The <strong>Sponsor</strong> skill (section 13) converts that player's salary into an equal amount of sponsor income.</p>
+<h3>Revenue per match</h3>
+<ul>
+  <li><strong>Attendance:</strong> dice-based – reputation × 100 per pip rolled; die size depends on stadium level (D6/D8/D10/D15/D20 for levels 1–5).</li>
+  <li><strong>Sponsor:</strong> a fixed €20,000.</li>
+  <li><strong>Win bonus:</strong> €8,000, only on a win.</li>
+  <li><strong>Fan shop:</strong> a fixed, reputation-dependent amount based on fan shop level (€0–€21,000).</li>
+  <li><strong>Catering:</strong> a percentage of that match's attendance revenue, rising from 5% (level 1) to 23% (level 5).</li>
+</ul>
+<h3>Reputation</h3>
+<p>Your club's reputation changes after every match on an Elo-like principle: beating a stronger-rated opponent gains more reputation than beating a weak one, and vice versa. Reputation feeds directly into attendance revenue. The Public Relations facility deliberately works asymmetrically: it boosts the reputation gain on a win but softens the loss on a defeat – so it can never hurt you.</p>
+<p>All financial figures from the last matchday, plus a preview calculation for the upcoming matchday, can be found together on <code>finances.html</code>.</p>
+
+<h2 id="gebaeude">24. The seven facilities</h2>
+<p>Every facility has one-time, geometrically increasing upgrade costs as well as ongoing maintenance per match (free at its starting level).</p>
+<dl>
+  <dt>Training centre (starts at level 1)</dt>
+  <dd>More training slots and a higher attribute cap (section 20). Upgradeable to level 3, costs €50,000 / €125,000, maintenance up to €16,000.</dd>
+  <dt>Academy (starts at level 1)</dt>
+  <dd>More theory slots and a higher skill limit (section 20). Same cost structure as the training centre.</dd>
+  <dt>Medical department (starts at level 1)</dt>
+  <dd>More treatment slots, faster healing, softened age-related decline (sections 21/22). Upgradeable to level 3, costs €35,000 / €90,000, maintenance up to €11,000.</dd>
+  <dt>Stadium (starts at level 1, every club needs a venue)</dt>
+  <dd>A bigger attendance die, meaning higher revenue – and also the cap up to which the fan shop and catering can be upgraded. Upgradeable to level 5, costs from €60,000 to €900,000, maintenance up to €67,000.</dd>
+  <dt>Fan shop (starts at level 0)</dt>
+  <dd>Fixed additional revenue per match. Upgradeable to level 5 (capped by stadium level), costs from €15,000 to €585,000, maintenance up to €17,400.</dd>
+  <dt>Catering (starts at level 0)</dt>
+  <dd>Percentage-based extra revenue on attendance income. Upgradeable to level 5 (also capped by stadium level), costs from €5,000 to €190,000, maintenance up to €5,300.</dd>
+  <dt>Public relations (starts at level 0)</dt>
+  <dd>Softens reputation losses on defeats and boosts gains on wins. Upgradeable to level 5, costs from €10,000 to €375,000, maintenance up to €35,000.</dd>
+</dl>
+<p>Each facility has its own page showing current and future maintenance costs plus an upgrade button (stadium, fan shop, and catering are bundled on <code>stadium.html</code>; the others are <code>training.html</code>, <code>academy.html</code>, <code>medical.html</code>, <code>public-relations.html</code>).</p>
+
+<h2 id="liga">25. The league</h2>
+<p>Instead of a single fixed opponent, you play a <strong>singleplayer league</strong> with 6 teams in total: your own club plus 5 fixed AI opponents (section 26).</p>
+<ul>
+  <li><strong>Schedule:</strong> a single round over 5 matchdays. You face the 5 opponents in ascending order of strength – matchday 1 against the weakest, matchday 5 against the strongest.</li>
+  <li>The other two matches on the same matchday (between the other AI teams) aren't played by you – they're automatically simulated based on a strength rating and locked in once you record your own result.</li>
+  <li><strong>Standings:</strong> 3 points for a win, 1 for a draw, 0 for a loss. Ties are broken, in order, by: touchdown difference, touchdowns scored, injury difference.</li>
+  <li>Once matchday 5 is done, the season is complete. The <strong>"New season"</strong> button starts a fresh schedule against the same opponents – your roster carries over, further developed.</li>
+</ul>
+<p>Standings and schedule have their own tabs on <code>league.html</code>; on <code>next-match.html</code> you can see your opponent for the upcoming matchday along with a strength rating (★).</p>
+
+<h2 id="gegner">26. Opponent clubs &amp; AI personalities</h2>
+<p>The five AI opponents form a fixed strength ladder, each with its own starting reputation and playing style:</p>
+<table>
+<tr><th>Rank</th><th>Club</th><th>Starting reputation</th><th>Style</th></tr>
+<tr><td>1</td><td>Meadow Grasshoppers</td><td>50</td><td>Rookies – everything at base stats, only starting skills, little structure.</td></tr>
+<tr><td>2</td><td>Green Cicadas</td><td>60</td><td>Solid, balanced all-rounders – serves as the reference team.</td></tr>
+<tr><td>3</td><td>Steel Ants</td><td>70</td><td>Defensive and rough – "swarm" style, little marking, high willingness to take risks when blocking/fouling.</td></tr>
+<tr><td>4</td><td>Storm Wasps</td><td>80</td><td>Fast &amp; aggressive – heavy on agility, scores quickly, thin on strength/block.</td></tr>
+<tr><td>5</td><td>Queen's Guard</td><td>90</td><td>Elite – attributes near maximum, multiple skills per player, strong across the board at a high level.</td></tr>
+</table>
+<p>Every opposing team controls its players not just by distance, but by a real team plan each turn: who secures the ball, who protects the ball carrier, who marks your most dangerous players. Five personality parameters (including how much the team protects its ball carrier, how much it marks rather than advancing indiscriminately, and how risk-tolerant it is when blocking and fouling) make sure the opponents feel noticeably different – the Steel Ants clearly play rougher and less organized than, say, the tactically disciplined Queen's Guard.</p>
+
+<h2 id="nach-dem-spiel">27. After the match &amp; settings</h2>
+<p>After every real match, the core game immediately shows a results screen: final score, touchdown timeline, a combined player list for both teams with match stats (plus reps/EP for your own players), the full financial breakdown for this match, an MVP highlight, and notes on injuries, forced retirements, and players newly enrolled in training.</p>
+<p>On <code>settings.html</code>, almost all rule and economy parameters from this rulebook (training, aging, medical, EP, economy, roster sizes) can be adjusted directly – useful if the game feels too easy, too hard, or too slow. The injury severity table (section 22) is deliberately left out, since it contains dice formulas rather than simple numbers. Clicking "Reset to default" undoes all changes.</p>
+
+<h2 id="ausblick">28. Current state &amp; outlook</h2>
+<p>This rulebook describes the complete current state of the core game and the manager (roster, training, aging, injuries, economy, seven facilities, singleplayer league with five AI opponents each with their own personality). Deliberately not yet implemented is a real <strong>online league against other humans</strong> with accounts – for now, the game remains a singleplayer prototype where every browser keeps its own, independent save. Also still open: different equipment variants (section 5), training facility levels 4–5, and flexible starting formations.</p>
+
+</body>
+</html>
