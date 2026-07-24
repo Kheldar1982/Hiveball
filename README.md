@@ -740,3 +740,8 @@ kein reines Einzeldatei-Prototyp mehr – und wegen der ES-Module jetzt zwingend
 (siehe Abschnitt 2, blockieren normale Browser aus Sicherheitsgründen). Ohne
 Verein bleibt das Kernspiel über den TEAM_ROSTER-Fallback weiterhin
 eigenständig spielbar.
+
+## Lizenz
+
+Siehe [`LICENSE`](LICENSE) – alle Rechte vorbehalten, keine Weiterverwendung
+ohne Zustimmung des Urhebers.

@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Hiveball – Spielanleitung</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 780px; margin: 3rem auto; padding: 0 1rem; line-height: 1.55; color: #1a1a1a; }
+  h1 { margin-bottom: 0.1rem; }
+  h1 + p.subtitle { color: #555; margin-top: 0; font-size: 1.05rem; }
+  p.stand { color: #777; font-size: 0.85rem; }
+  h2 { margin-top: 2.5rem; padding-top: 0.5rem; border-top: 2px solid #ddd; }
+  h3 { margin-top: 1.5rem; }
+  a { color: #0a58ca; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.92rem; }
+  th, td { border: 1px solid #ccc; padding: 0.4rem 0.6rem; text-align: left; }
+  th { background: #f0f0f0; }
+  dt { font-weight: bold; margin-top: 0.9rem; }
+  dd { margin-left: 0; color: #333; }
+  .hint { background: #eef4ff; border-left: 4px solid #0a58ca; padding: 0.6rem 1rem; margin: 1rem 0; }
+  .toc { background: #f7f7f7; border: 1px solid #ddd; padding: 1rem 1.5rem; }
+  .toc h2 { margin-top: 0; border-top: none; }
+  .toc ol { margin: 0; padding-left: 1.3rem; }
+  .toc li { margin-bottom: 0.15rem; }
+  .part-label { color: #0a58ca; font-weight: bold; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.05em; }
+  code { background: #f0f0f0; padding: 0.1rem 0.3rem; border-radius: 3px; }
+  @media print {
+    a { color: inherit; text-decoration: none; }
+    .no-print { display: none; }
+    h2 { border-top: none; }
+  }
+</style>
+</head>
+<body>
+
+<p class="no-print"><a href="../index.html">&larr; Zurück zur Startseite</a> · <a href="einsteiger.html">Noch nie Blood Bowl/Football gesehen? Hier lang</a></p>
+
+<h1>🏈 Hiveball – Spielanleitung</h1>
+<p class="subtitle">Ein rundenbasiertes 5-gegen-5-Football-Taktikspiel mit Vereins-Manager und Singleplayer-Liga</p>
+<p class="stand">Stand: Juli 2026 – deckt Kernspiel und Manager-Teil vollständig ab.</p>
+
+<div class="toc">
+<h2>Inhalt</h2>
+<p class="part-label">Teil 1 – Das Kernspiel</p>
+<ol>
+  <li><a href="#was-ist-hiveball">Was ist Hiveball?</a></li>
+  <li><a href="#spielfeld-teams">Spielfeld &amp; Teams</a></li>
+  <li><a href="#positionen">Die Positionen</a></li>
+  <li><a href="#attribute">Attribute im Detail</a></li>
+  <li><a href="#ausruestung">Ausrüstung</a></li>
+  <li><a href="#wuerfel">Das Würfelsystem (W10)</a></li>
+  <li><a href="#zugablauf">Ablauf eines Spielzugs</a></li>
+  <li><a href="#bewegung">Bewegung &amp; Tacklezonen</a></li>
+  <li><a href="#blocken">Blocken</a></li>
+  <li><a href="#verletzungen">Verletzungen: Rüstungswert &amp; Stamina</a></li>
+  <li><a href="#foul">Foul</a></li>
+  <li><a href="#passen">Passen &amp; Fangen</a></li>
+  <li><a href="#skills">Skills</a></li>
+  <li><a href="#spielende">Spielende &amp; Sieg</a></li>
+  <li><a href="#kurzreferenz-kernspiel">Kurzreferenz Kernspiel</a></li>
+</ol>
+<p class="part-label">Teil 2 – Der Manager</p>
+<ol start="16">
+  <li><a href="#manager-ueberblick">Überblick: Was macht der Manager?</a></li>
+  <li><a href="#verein-kader">Verein gründen &amp; Kader</a></li>
+  <li><a href="#transfermarkt">Transfermarkt</a></li>
+  <li><a href="#nominierung">Matchday-Nominierung</a></li>
+  <li><a href="#training">Training: Trainingscenter &amp; Akademie</a></li>
+  <li><a href="#alterung">Alterung &amp; Karriereende</a></li>
+  <li><a href="#medizin">Verletzungen &amp; Medizinische Abteilung</a></li>
+  <li><a href="#oekonomie">Vereinsökonomie</a></li>
+  <li><a href="#gebaeude">Die sieben Gebäude</a></li>
+  <li><a href="#liga">Die Liga</a></li>
+  <li><a href="#gegner">Gegnervereine &amp; KI-Persönlichkeiten</a></li>
+  <li><a href="#nach-dem-spiel">Nach dem Spiel &amp; Einstellungen</a></li>
+  <li><a href="#ausblick">Stand &amp; Ausblick</a></li>
+</ol>
+</div>
+
+<h2 id="was-ist-hiveball">1. Was ist Hiveball?</h2>
+<p>Hiveball ist ein rundenbasiertes Taktikspiel für zwei Teams à 5 Spieler, lose inspiriert von American-Football-Brettspielen, aber mit eigenständigen Regeln: eigene Attributsnamen, ein W10 (10-seitiger Würfel) statt der sonst üblichen W6, und einige eigene Mechaniken wie der Zonenbonus beim Tackle oder die distanzbasierte Passschwierigkeit.</p>
+<p>Ziel des Spiels: mehr Touchdowns erzielen als der Gegner, indem man den Ball in die gegnerische Endzone bringt.</p>
+<p>Das Spiel besteht aus zwei Teilen: dem <strong>Kernspiel</strong> (das eigentliche Match, Teil 1 dieser Anleitung) und dem <strong>Manager</strong> (Vereinsverwaltung zwischen den Spielen: Kader, Training, Ökonomie, Liga – Teil 2). Beide hängen zusammen: Hast du im Manager einen Verein mit einer vollständigen Matchday-Nominierung angelegt, spielst du im Kernspiel mit genau diesen Spielern samt ihren trainierten Werten und Skills gegen den jeweiligen Liga-Gegner. Ohne Verein bleibt das Kernspiel weiterhin eigenständig mit einer festen Beispielaufstellung spielbar.</p>
+<div class="hint">Alle Spielstände (Vereine, Kader, Liga, Einstellungen) werden ausschließlich lokal in deinem Browser gespeichert (<code>localStorage</code>). Es gibt kein Konto, keinen Server und keinen Online-Mehrspielermodus – jeder Browser/jedes Gerät hat seinen eigenen, unabhängigen Spielstand.</div>
+
+<h3>Die Oberfläche des Kernspiels</h3>
+<p>Oberhalb des Spielfelds zeigt eine Kopfleiste die Teamnamen, den Punktestand und die Zugzahl. Rechts neben dem Feld erscheint ein Spieler-Info-Panel für den gerade ausgewählten Spieler (Attribute, Skills, Aktions-Buttons), darunter das Spiel-Log. Die komplette Regel-Legende ist über den Button <strong>"❓ Hilfe"</strong> jederzeit als Overlay abrufbar, statt permanent auf dem Bildschirm zu stehen.</p>
+
+<h2 id="spielfeld-teams">2. Spielfeld &amp; Teams</h2>
+<p>Das Spielfeld ist ein Raster aus 13 Spalten × 7 Reihen. Jedes Team hat eine Endzone an einem Ende des Feldes:</p>
+<ul>
+  <li>Team <strong>Blau</strong> (von dir gesteuert) startet links, greift nach rechts an – die rechte Spalte ist die Endzone von Blau.</li>
+  <li>Team <strong>Rot</strong> (Computer-KI, dein Liga-Gegner) startet rechts, greift nach links an.</li>
+</ul>
+<p>Jedes Team besteht aus 5 Feldspielern. Jeder Spieler trägt eine Trikotnummer von 1–5. Zu Spielbeginn würfeln beide Teams je einen W10 – wer höher würfelt, beginnt (bei Gleichstand wird neu gewürfelt).</p>
+
+<h2 id="positionen">3. Die Positionen</h2>
+<p>Jede Position hat ein eigenes Profil aus Stärken und Schwächen, erkennbar am Icon auf dem Spielfeld. Die Standardaufstellung ("Option A") besteht aus 2× Blocker, 1× Werfer, 1× Fänger, 1× Läufer.</p>
+<table>
+<tr><th>Icon</th><th>Position</th><th>Stärken</th><th>Rolle im Team</th></tr>
+<tr><td>🛡️ (2×)</td><td>Blocker</td><td>Block, Stärke, Widerstandsfähigkeit</td><td>Räumt Gegner aus dem Weg, schützt den Ballträger</td></tr>
+<tr><td>🎯</td><td>Werfer</td><td>Passgenauigkeit</td><td>Wirft den Ball zu Mitspielern</td></tr>
+<tr><td>🙌</td><td>Fänger</td><td>Ballaufnahme/Fangen</td><td>Fängt Pässe, bringt den Ball ins Ziel</td></tr>
+<tr><td>🏃</td><td>Läufer</td><td>Bewegung, Agilität</td><td>Schnell über das Feld, Ballträger</td></tr>
+<tr><td>🧑</td><td>Lineman</td><td>keine besondere Stärke/Schwäche</td><td>Günstige Kader-Ergänzung, siehe unten</td></tr>
+</table>
+<p>Der <strong>Lineman</strong> ist eine sechste, rein im Manager-Teil verfügbare Position: solide Durchschnittswerte ohne Ausreißer nach oben oder unten, kein Startskill, deutlich günstiger im Einkauf als die vier Spezialpositionen (siehe Abschnitt 18). Vereine verpflichten Lineman über den Transfermarkt, um für Notfälle (Verletzungen, Platzverweise während eines Matches) genügend Ersatzspieler auf der Bank zu haben, ohne die teureren Spezialpositionen mehrfach kaufen zu müssen. Anders als bei Blocker/Werfer/Fänger/Läufer gibt es für Lineman keine Obergrenze, wie viele gleichzeitig im Kader stehen dürfen.</p>
+
+<h2 id="attribute">4. Attribute im Detail</h2>
+<p>Jeder Spieler hat sechs Grundwerte plus zwei daraus abgeleitete Werte. Höher ist bei allen Werten immer besser.</p>
+<table>
+<tr><th>Kürzel</th><th>Name</th><th>Bedeutung</th></tr>
+<tr><td>MR</td><td>Movement Range</td><td>Wie viele Felder sich der Spieler pro Zug regulär bewegen kann</td></tr>
+<tr><td>BL</td><td>Block</td><td>Stärke im direkten Zweikampf (Blocken/Tackeln)</td></tr>
+<tr><td>ST</td><td>Stärke</td><td>Wie viel Schaden der Spieler bei einem gewonnenen Zweikampf verursacht</td></tr>
+<tr><td>CO</td><td>Konstitution</td><td>Grundlage für Rüstungswert und Stamina (siehe unten)</td></tr>
+<tr><td>AG</td><td>Agilität</td><td>Fangen, Ballaufnahme, Ausweichen, Extrafelder</td></tr>
+<tr><td>PA</td><td>Pass-Genauigkeit</td><td>Wie zuverlässig der Spieler wirft</td></tr>
+<tr><td>RW</td><td>Rüstungswert</td><td>Widerstand gegen Verletzungen (CO + Ausrüstungsbonus)</td></tr>
+<tr><td>SP</td><td>Stamina Points</td><td>"Lebenspunkte" – fallen sie auf 0, scheidet der Spieler verletzt aus</td></tr>
+</table>
+
+<h3>Werte je Position (inkl. Standard-Ausrüstung)</h3>
+<table>
+<tr><th>Position</th><th>MR</th><th>BL</th><th>ST</th><th>CO</th><th>RW</th><th>SP</th><th>AG</th><th>PA</th></tr>
+<tr><td>Blocker</td><td>4</td><td>5</td><td>5</td><td>5</td><td>8</td><td>15</td><td>2</td><td>3</td></tr>
+<tr><td>Läufer</td><td>6</td><td>3</td><td>3</td><td>3</td><td>6</td><td>9</td><td>6</td><td>5</td></tr>
+<tr><td>Fänger</td><td>6</td><td>2</td><td>2</td><td>3</td><td>6</td><td>9</td><td>7</td><td>6</td></tr>
+<tr><td>Werfer</td><td>5</td><td>3</td><td>3</td><td>4</td><td>7</td><td>12</td><td>4</td><td>6</td></tr>
+<tr><td>Lineman</td><td>5</td><td>3</td><td>3</td><td>3</td><td>6</td><td>9</td><td>3</td><td>3</td></tr>
+</table>
+<p>Aufstehen aus der Bodenlage kostet 2 Bewegungspunkte (MR) – ein umgefallener Spieler kann sich also nicht gratis wieder aufrappeln.</p>
+
+<h2 id="ausruestung">5. Ausrüstung</h2>
+<p>Jeder Spieler trägt vier Ausrüstungsteile. Aktuell hat jeder Spieler dieselbe Standardausrüstung – in Zukunft sollen unterschiedliche Varianten mit eigenen Vor- und Nachteilen dazukommen.</p>
+<table>
+<tr><th>Slot</th><th>Aktueller Effekt</th><th>Geplant für die Zukunft</th></tr>
+<tr><td>Körperrüstung</td><td>+3 auf den Rüstungswert (RW)</td><td>Leichtere/schwerere Varianten: mehr RW, dafür z.B. weniger MR</td></tr>
+<tr><td>Schuhe</td><td>kein Effekt</td><td>MR-Bonus, sicherer Tritt bei Extrafeldern, Foul-Boni</td></tr>
+<tr><td>Helm</td><td>kein Effekt</td><td>Schutz vor kritischen Treffern, zusätzliche Stamina</td></tr>
+<tr><td>Handschuhe</td><td>kein Effekt</td><td>Boni beim Fangen, Werfen oder Blocken</td></tr>
+</table>
+<p>Die RW-Werte in der Tabelle aus Abschnitt 4 enthalten den Bonus der Standard-Körperrüstung bereits.</p>
+
+<h2 id="wuerfel">6. Das Würfelsystem (W10)</h2>
+<p>Fast jede Aktion in Hiveball wird mit einem 10-seitigen Würfel (W10) entschieden.</p>
+<ul>
+  <li>Eine gewürfelte <strong>10</strong> ist immer ein Erfolg – bei Zweikämpfen sogar ein automatischer Sieg, egal wie die Werte stehen.</li>
+  <li>Eine gewürfelte <strong>1</strong> ist immer ein Misserfolg – bei Zweikämpfen eine automatische Niederlage.</li>
+  <li><strong>Zielwert-Würfe</strong> (z.B. Fangen, Passen): Wurf + eigenes Attribut muss einen Zielwert erreichen oder übertreffen.</li>
+  <li><strong>Zweikampf-Würfe</strong> (z.B. Block, Tackle): beide Seiten würfeln, wer die höhere Summe (Wurf + Attribut + Boni) hat, gewinnt.</li>
+</ul>
+
+<h2 id="zugablauf">7. Ablauf eines Spielzugs</h2>
+<p>Teams wechseln sich mit ganzen Zügen ab. Innerhalb eines eigenen Zuges kann ein Team mehrere Spieler bewegen, aber jeder Spieler darf pro Zug nur eine aktive Aktion ausführen:</p>
+<ul>
+  <li><strong>Bewegen</strong> – bis zu MR Felder (plus optional Extrafelder, siehe Abschnitt 8)</li>
+  <li><strong>Blocken</strong> – gegen einen angrenzenden, stehenden Gegner (Abschnitt 9)</li>
+  <li><strong>Passen</strong> – Ball zu einem Mitspieler werfen (Abschnitt 12)</li>
+  <li><strong>Foul</strong> – gegen einen angrenzenden, liegenden Gegner (Abschnitt 11), maximal einmal pro Zug im ganzen Team</li>
+</ul>
+<p>Ein Zug endet, wenn der Spieler auf "Zug beenden" klickt oder alle Spieler agiert haben.</p>
+
+<h2 id="bewegung">8. Bewegung &amp; Tacklezonen</h2>
+<h3>Tacklezonen</h3>
+<p>Jeder stehende (nicht liegende) Spieler kontrolliert die 8 Felder um sich herum – seine Tacklezone. Innerhalb einer gegnerischen Tacklezone werden Fangen, Werfen und Ballaufnahme um je 1 pro gegnerischer Zone erschwert.</p>
+<h3>Tackle beim Weglaufen (Dodge)</h3>
+<p>Verlässt ein Spieler (Dodger) die Tacklezone eines Gegners (Tackler), darf dieser einen Tackle-Versuch machen: BL des Tacklers gegen AG des Dodgers.</p>
+<ul>
+  <li>Bleibt der Dodger dabei in derselben Tacklezone, erhält der Tackler +1 auf seinen Wurf.</li>
+  <li>Gewinnt der Tackler: der Dodger fällt an seiner Ausgangsposition um und durchläuft einen Verletzungscheck (Abschnitt 10). Die Bewegung wird abgebrochen.</li>
+  <li>Würfelt der Tackler dabei eine natürliche 1: er verreißt den Tackle und stürzt selbst (mit eigenem Verletzungsrisiko).</li>
+</ul>
+<h3>Extrafelder</h3>
+<p>Sind die regulären MR aufgebraucht, kann sich ein Spieler bis zu 2 zusätzliche Felder bewegen. Jedes Extrafeld kostet 1 SP (Stamina) und erfordert einen Agilitätswurf (W10 + AG) gegen Zielwert 10. Bei einem Fehlschlag stürzt der Spieler an seiner aktuellen Position und verliert zusätzlich 1 SP (insgesamt also 2 SP für dieses Feld) – ein getragener Ball fällt dabei zu Boden.</p>
+
+<h2 id="blocken">9. Blocken</h2>
+<p>Ein Block ist eine aktive Aktion gegen einen direkt angrenzenden, stehenden Gegner: ein BL-Zweikampf, der Verlierer fällt um und durchläuft einen Verletzungscheck (Abschnitt 10).</p>
+<h3>Unterstützung (Assists)</h3>
+<p>Teamkameraden, die in der Tacklezone des Ziels stehen (aber selbst in keiner weiteren gegnerischen Zone), addieren die Hälfte ihres BL-Werts (abgerundet) zum Blockwurf. Das gilt für beide Seiten gleichzeitig.</p>
+<h3>Bewegungsabzug</h3>
+<p>Ein Block nach vorheriger Bewegung im selben Zug ist erschwert: pro angefangene 2 bereits genutzte MR sinkt der BL-Wert des Blockers (nicht des Ziels) um 1. Aufstehen zählt mit.</p>
+<div class="hint">Beispiel: Ein Blocker mit BL 5 hat in diesem Zug bereits 3 seiner 4 MR verbraucht. 3 aufgerundet auf 2er-Schritte = 2 Schritte → −2 auf BL, also effektiv BL 3 für diesen Block.</div>
+
+<h2 id="verletzungen">10. Verletzungen: Rüstungswert &amp; Stamina</h2>
+<p>Nach jedem verlorenen Block oder Tackle folgt ein Verletzungscheck:</p>
+<ol>
+  <li>Der Gewinner würfelt W10 + seine eigene ST.</li>
+  <li>Davon wird der Rüstungswert (RW) des Verlierers abgezogen. Ist das Ergebnis negativ, richtet der Treffer keinen Schaden an.</li>
+  <li>Die verbleibende Differenz wird von den SP (Stamina Points) des Verlierers abgezogen.</li>
+</ol>
+<div class="hint">Ergebnis: Fallen die SP auf 0 oder darunter, ist der Spieler verletzt und scheidet für den Rest des Spiels aus. Bleiben SP über 0, liegt der Spieler nur am Boden und kann normal wieder aufstehen (kostet 2 MR).</div>
+<p>SP werden außerdem durch Extrafelder (Abschnitt 8) und durch Fouls (Abschnitt 11) verbraucht. Regeneriert wird SP bislang nur nach einem erzielten Touchdown (Abschnitt 14) – alle Spieler mit SP über 0 erholen sich dabei um ihren CO-Wert, maximal bis zum Startwert.</p>
+
+<h2 id="foul">11. Foul</h2>
+<p>Ein stehender Spieler, der in diesem Zug noch nicht agiert hat, kann einen angrenzenden, liegenden Gegner foulen. Das zählt als seine Aktion für diesen Zug. Pro Zug ist nur ein Foul im gesamten Team erlaubt – egal wie viele Spieler noch frei sind.</p>
+<ol>
+  <li><strong>Verletzungscheck:</strong> exakt wie in Abschnitt 10 – W10 + ST des Foulenden gegen RW des Opfers, Differenz kostet dessen SP.</li>
+  <li><strong>Entdeckungswurf:</strong> AG des Foulenden gegen Zielwert 5, zusätzlich erschwert um den halben angerichteten Schaden. Bei Erfolg bleibt das Foul unentdeckt. Bei Misserfolg wird der Foulende vom Platz gestellt und scheidet ebenfalls aus (ohne selbst SP zu verlieren).</li>
+</ol>
+<div class="hint">Taktische Note: Ein Blocker (hohe ST, niedrige AG) richtet beim Foul viel Schaden an, wird aber öfter erwischt. Ein Fänger oder Läufer (hohe AG, niedrige ST) foult risikoärmer, aber mit weniger Wirkung. Der Skill <strong>Hinterhältig</strong> senkt den Entdeckungs-Zielwert für spezialisierte Spieler wieder um 1.</div>
+
+<h2 id="passen">12. Passen &amp; Fangen</h2>
+<ul>
+  <li>Maximale Passdistanz: 9 Felder (diagonale Schritte zählen etwas mehr als gerade Schritte).</li>
+  <li>Zielwert für den Wurf: 5 + zurückgelegte Distanz (aufgerundet), zusätzlich erschwert durch eigene Tacklezonen-Belastung.</li>
+  <li>Distanz-Einordnung: bis 3 Felder = Kurzer Pass, bis 6 Felder = Langer Pass, darüber = Bombe.</li>
+  <li>Nach einem erfolgreichen Wurf folgt ein Fangversuch: Zielwert 8 + Tacklezonen des Fängers.</li>
+  <li>Liegende Spieler können weder fangen noch als Passziel gewählt werden.</li>
+</ul>
+<h3>Ballaufnahme &amp; Streuung</h3>
+<p>Um einen losen Ball aufzunehmen, ist ein Wurf gegen Zielwert 8 (+ Tacklezonen) nötig. Bei Misserfolg ist das ein Turnover, und der Ball streut zufällig über die 8 Nachbarfelder, bis er entweder gefangen wird oder frei liegen bleibt (Fangversuch dort: Zielwert 9, also 1 schwerer als normal).</p>
+
+<h2 id="skills">13. Skills</h2>
+<p>Jede Position bringt von Beginn an einen festen Startskill mit (außer Lineman). Alle weiteren Skills werden im Manager-Teil über die Akademie gegen EP erlernt (Abschnitt 20) – dabei ist ein Spieler nicht auf die "typischen" Skills seiner Position beschränkt.</p>
+<table>
+<tr><th>Skill</th><th>Startskill von</th><th>Effekt</th></tr>
+<tr><td>Blitz</td><td>Läufer</td><td>Kein Bewegungsabzug beim Blocken, egal wie viele MR bereits genutzt wurden.</td></tr>
+<tr><td>Block</td><td>Blocker</td><td>+1 auf den Blockwurf, für Blocker und Ziel. Haben beide den Skill, heben sich die Boni auf; hat nur einer ihn, gewinnt er bei Gleichstand automatisch.</td></tr>
+<tr><td>Dodge</td><td>Fänger</td><td>Wird der Spieler geblockt, wirft er AG statt BL. Gewinnt er, fällt der Angreifer nicht um (außer bei einer gewürfelten natürlichen 1).</td></tr>
+<tr><td>Zielwurf</td><td>–</td><td>+1 auf den Wurfversuch beim Passen.</td></tr>
+<tr><td>Ruhiger Kopf</td><td>–</td><td>Ignoriert gegnerische Tacklezonen beim Passen bzw. Fangen (kein Malus).</td></tr>
+<tr><td>Rückendeckung</td><td>–</td><td>Unterstützt einen Block auch aus einer zweiten gegnerischen Tacklezone heraus, dann mit +1 statt der halben BL.</td></tr>
+<tr><td>Ballsicher</td><td>–</td><td>+1 bei der Ballaufnahme vom Boden.</td></tr>
+<tr><td>Robust</td><td>–</td><td>−1 Schaden (mindestens 0) beim Verletzungscheck als Verlierer.</td></tr>
+<tr><td>Gewandt</td><td>–</td><td>+1 auf den Ausweichwurf (AG-Seite) beim Tackle.</td></tr>
+<tr><td>Zweite Luft</td><td>–</td><td>Das erste Extrafeld einer Bewegung kostet keine Stamina.</td></tr>
+<tr><td>Trittsicher</td><td>–</td><td>+1 auf den Erfolgswurf beim Extrafeld gehen.</td></tr>
+<tr><td>Hinterhältig</td><td>–</td><td>−1 auf den Entdeckungs-Zielwert beim Foul.</td></tr>
+<tr><td>Sponsor</td><td>–</td><td>Rein ökonomisch, kein Effekt im Match: kehrt das Gehalt dieses Spielers in eine gleich hohe Sponsoreneinnahme des Vereins um.</td></tr>
+</table>
+<div class="hint">Im Manager verpflichtete Werfer starten mit dem Skill <strong>Zielwurf</strong>. Die feste Beispielaufstellung des Kernspiels ohne Verein hat dagegen weiterhin keinen Werfer-Startskill.</div>
+
+<h2 id="spielende">14. Spielende &amp; Sieg</h2>
+<ul>
+  <li>Sofortiger Sieg bei 3 Touchdowns.</li>
+  <li>Andernfalls endet das Spiel nach 10 Zügen pro Team – wer dann mehr Touchdowns hat, gewinnt. Bei Gleichstand ist es ein Unentschieden.</li>
+  <li>Nach jedem Touchdown: Punktestand +1, alle Spieler kehren auf ihre Startpositionen zurück, der Ball geht zur Feldmitte, und der Zug wechselt automatisch zum anderen Team.</li>
+</ul>
+
+<h2 id="kurzreferenz-kernspiel">15. Kurzreferenz Kernspiel</h2>
+<table>
+<tr><th>Aktion</th><th>Zielwert / Mechanik</th></tr>
+<tr><td>Ballaufnahme</td><td>W10 + AG ≥ 8 (+ Tacklezonen)</td></tr>
+<tr><td>Fangen (nach Pass)</td><td>W10 + AG ≥ 8 (+ Tacklezonen)</td></tr>
+<tr><td>Fangen (aus Streuung)</td><td>W10 + AG ≥ 9 (+ Tacklezonen)</td></tr>
+<tr><td>Werfen</td><td>W10 + PA ≥ 5 + Distanz (+ Tacklezonen)</td></tr>
+<tr><td>Extrafeld</td><td>W10 + AG ≥ 10, kostet 1 SP (2 SP bei Fehlschlag)</td></tr>
+<tr><td>Block / Tackle</td><td>W10 + BL (bzw. AG bei Dodge) – höhere Summe gewinnt</td></tr>
+<tr><td>Verletzungscheck</td><td>(W10 + ST des Gewinners) − RW des Verlierers = SP-Schaden</td></tr>
+<tr><td>Foul-Entdeckung</td><td>W10 + AG ≥ 5 + halber Schaden</td></tr>
+<tr><td>Aufstehen</td><td>kostet 2 MR</td></tr>
+</table>
+
+<h2 id="manager-ueberblick">16. Überblick: Was macht der Manager?</h2>
+<p>Der Manager-Teil (<code>src/manager/</code>) ist die Vereinsverwaltung zwischen den Matches: Kader zusammenstellen, Spieler trainieren, Vereinskasse im Blick behalten, Gebäude ausbauen und eine Saison in der Liga bestreiten. Du erreichst ihn über <code>src/manager/index.html</code> (Kader-Seite, zugleich Startpunkt zum Verein gründen). Von dort führt eine gemeinsame Navigationsleiste zu allen weiteren Manager-Seiten. Genau wie das Kernspiel läuft alles rein im Browser, ohne Server – ein Verein ist an den Browser gebunden, in dem er angelegt wurde.</p>
+
+<h2 id="verein-kader">17. Verein gründen &amp; Kader</h2>
+<p>Beim ersten Aufruf der Kader-Seite ohne bestehenden Verein zeigt Hiveball ein Formular zum Gründen eines neuen Vereins. Jeder neue Verein startet mit <strong>200.000 €</strong> Kapital und den sieben Gebäuden auf ihrem jeweiligen Startlevel (siehe Abschnitt 24).</p>
+<ul>
+  <li>Maximale Kadergröße: <strong>12 Spieler</strong>.</li>
+  <li>Von den Spezialpositionen (Blocker/Werfer/Fänger/Läufer) dürfen jeweils höchstens <strong>2</strong> gleichzeitig im Matchday-Kader auf "Feld" stehen – für Lineman gilt diese Grenze nicht.</li>
+  <li>In der Übersicht (<code>overview.html</code>) siehst du Kasse, Teamwert und Kadergröße auf einen Blick, dazu den Level-Stand aller Gebäude.</li>
+  <li>In der "Gefahrenzone" derselben Seite kannst du deinen Verein über den Button <strong>"Team löschen"</strong> (mit Bestätigungsdialog) unwiderruflich löschen – das entfernt den kompletten Kader inkl. Hall-of-Fame-Einträgen und den Liga-/Saisonstand dieses Vereins. Globale Einstellungen (Abschnitt 27) bleiben davon unberührt.</li>
+</ul>
+
+<h2 id="transfermarkt">18. Transfermarkt</h2>
+<p>Neue Spieler kaufst du über den Transfermarkt zum Grundpreis ihrer Position:</p>
+<table>
+<tr><th>Position</th><th>Grundpreis</th></tr>
+<tr><td>Lineman</td><td>30.000 €</td></tr>
+<tr><td>Blocker</td><td>50.000 €</td></tr>
+<tr><td>Werfer</td><td>55.000 €</td></tr>
+<tr><td>Fänger</td><td>60.000 €</td></tr>
+<tr><td>Läufer</td><td>65.000 €</td></tr>
+</table>
+<p>Der tatsächliche <strong>Marktwert</strong> eines bereits entwickelten Spielers steigt über den Grundpreis hinaus: +2.500 € pro Attributpunkt über dem Positions-Grundwert, +10.000 € pro zusätzlich erlerntem Skill. Dieser Marktwert ist zugleich Grundlage für die Gehaltsberechnung (Abschnitt 22).</p>
+
+<h2 id="nominierung">19. Matchday-Nominierung</h2>
+<p>Vor jedem Ligaspiel legst du auf <code>next-match.html</code> fest, wer mitspielt. Jeder Kaderspieler bekommt einen von drei Status:</p>
+<dl>
+  <dt>Feld</dt>
+  <dd>Die 5 aktiven Startspieler für das kommende Match.</dd>
+  <dt>Bank</dt>
+  <dd>Bis zu 3 Ersatzspieler, die während des Matches bei Verletzung oder Platzverweis eines Feldspielers einwechseln (gleiche Position bevorzugt, sonst Lineman, sonst beliebig verfügbar).</dd>
+  <dt>Frei</dt>
+  <dd>Nicht nominiert, kommt in diesem Match nicht zum Einsatz – kostet nur den niedrigsten Gehaltssatz.</dd>
+</dl>
+<p>Insgesamt können höchstens 8 Spieler pro Spieltag nominiert werden (5 Feld + 3 Bank). Fehlen während des laufenden Matches Ersatzspieler auf der Bank, spielt dein Team bewusst in Unterzahl weiter.</p>
+
+<h2 id="training">20. Training: Trainingscenter &amp; Akademie</h2>
+<p>Spieler verbessern sich nicht automatisch, sondern über zwei getrennte Systeme:</p>
+<h3>Reps &amp; physisches Training (Trainingscenter)</h3>
+<p>Während eines Matches sammelt jeder Spieler mit Kaderanbindung sogenannte <strong>Reps</strong> auf seine Attribute (z.B. BL bei jedem Blockversuch, AG bei Ballaufnahme/Fang, PA bei gelungenem Pass), gedeckelt auf maximal 4 pro Attribut und Spiel. Über <code>training.html</code> werden gesammelte Reps in freien Trainings-Slots des Trainingscenters tatsächlich in Attributpunkte umgewandelt. Das Trainingscenter-Level bestimmt sowohl die Zahl der Slots pro Zyklus (Level 1: 3, Level 2: 5, Level 3: 7 inkl. Doppeltraining) als auch die Obergrenze für jedes Attribut (Positions-Grundwert + Level, MR ausgenommen – MR ist positionsfest und nicht trainierbar).</p>
+<h3>Skills &amp; Theorie-Training (Akademie)</h3>
+<p>Zusätzliche Skills werden mit EP (Erfahrungspunkten) auf <code>academy.html</code> gekauft und über freie Akademie-Slots trainiert. Jeder Spieler erhält EP aus seinen Matchleistungen: Teilnahme 3, Touchdown 8, gelungener Pass 3, Fang 3, gewonnener Block 3, überstandener Tackle 2, Sieg-Bonus 5, MVP-Bonus 6, dazu kleine Boni für Bomben-Pässe und Blocks gegen einen stärkeren Gegner (Underdog). Die Akademie-Stufe begrenzt, wie viele zusätzliche Skills (über den Startskill hinaus) ein Spieler gleichzeitig lernen darf: Level 1 → 1, Level 2 → 2, Level 3 → 3, plus einen weiteren Bonus-Skill in den Altersphasen Routinier/Veteran (Abschnitt 21). Jeder weitere Skill wird teurer als der vorherige (Multiplikator ×1,5 / ×2 / ×2,5).</p>
+<table>
+<tr><th>Skill</th><th>EP-Kosten</th></tr>
+<tr><td>Blitz / Block / Zielwurf / Trittsicher / Ballsicher</td><td>100</td></tr>
+<tr><td>Rückendeckung / Zweite Luft / Hinterhältig</td><td>110</td></tr>
+<tr><td>Ruhiger Kopf / Sponsor / Robust / Gewandt</td><td>125</td></tr>
+<tr><td>Dodge</td><td>150</td></tr>
+</table>
+
+<h2 id="alterung">21. Alterung &amp; Karriereende</h2>
+<p>Spieler starten mit 20 Jahren und durchlaufen alle 6 gespielten Matches (echte Ligaspiele zählen genauso wie der Debug-Button "Spiele simulieren") einen Alterszyklus:</p>
+<table>
+<tr><th>Phase</th><th>bis Alter</th><th>Trainings-Tempo</th><th>Verfallschance</th></tr>
+<tr><td>Talent</td><td>23</td><td>×0,7 (langsamer)</td><td>0 %</td></tr>
+<tr><td>Peak</td><td>29</td><td>×1,0</td><td>0 %</td></tr>
+<tr><td>Routinier</td><td>32</td><td>×1,0</td><td>20 %</td></tr>
+<tr><td>Veteran</td><td>35</td><td>×1,5 (schneller)</td><td>40 %</td></tr>
+<tr><td>Karriereende</td><td>37</td><td>–</td><td>100 %</td></tr>
+</table>
+<p>"Verfallschance" bedeutet: pro Alterszyklus kann der Spieler stattdessen an Attributen verlieren statt zu trainieren. Ab Alter <strong>38</strong> geht ein Spieler zwangsweise in Rente. Eine gut ausgebaute Medizinische Abteilung verzögert und dämpft diesen Verfall (siehe Abschnitt 22). Scheidet ein Spieler durch Zwangsrente aus, bleibt sein Datensatz mit voller Statistik und Ausscheidegrund in der <strong>Hall of Fame</strong> (<code>hall-of-fame.html</code>) erhalten.</p>
+
+<h2 id="medizin">22. Verletzungen &amp; Medizinische Abteilung</h2>
+<p>Scheidet ein Spieler während eines Matches verletzt aus (SP auf 0 oder darunter, siehe Abschnitt 10), würfelt der Manager anschließend die Verletzungsschwere aus:</p>
+<table>
+<tr><th>Schwere</th><th>Ausfallzeit</th><th>Attributverlust-Risiko</th></tr>
+<tr><td>Geprellt</td><td>0 Spiele</td><td>–</td></tr>
+<tr><td>Angeschlagen</td><td>1 Spiel</td><td>–</td></tr>
+<tr><td>Verletzt</td><td>2 Spiele</td><td>–</td></tr>
+<tr><td>Schwer verletzt</td><td>3–5 Spiele</td><td>20 %</td></tr>
+<tr><td>Schwerste Verletzung</td><td>6–9 Spiele</td><td>100 %, zusätzlich 8 % Zwangsrente</td></tr>
+</table>
+<p>Jeder verletzte Spieler heilt passiv um 1 Spiel Ausfallzeit pro gespieltem Match. Wird er zusätzlich manuell einem Behandlungsplatz zugewiesen (<code>medical.html</code>), heilt er stattdessen mit einer höheren, levelabhängigen Reduktion (Level 1: 2, Level 2: 3, Level 3: 4 pro Spiel) und wird automatisch entlassen, sobald er vollständig geheilt ist. Die Zahl gleichzeitiger Behandlungsplätze entspricht dem Level der Medizinischen Abteilung (1/2/3).</p>
+
+<h2 id="oekonomie">23. Vereinsökonomie</h2>
+<h3>Ausgaben</h3>
+<p>Gehälter werden nach der tatsächlichen Rolle im jeweiligen Match berechnet (nicht nach der reinen Nominierung davor) – ein während des Matches eingewechselter Spieler zahlt bereits den Feld-Satz:</p>
+<ul>
+  <li>Feld: 10 % des Marktwerts</li>
+  <li>Bank: 5 % des Marktwerts</li>
+  <li>Frei: 2 % des Marktwerts</li>
+</ul>
+<p>Der Skill <strong>Sponsor</strong> (Abschnitt 13) kehrt das Gehalt des betreffenden Spielers in eine gleich hohe Sponsoreneinnahme um.</p>
+<h3>Einnahmen pro Match</h3>
+<ul>
+  <li><strong>Zuschauer:</strong> würfelbasiert – Reputation × 100 pro gewürfeltem Pip; die Würfelgröße hängt vom Stadion-Level ab (W6/W8/W10/W15/W20 für Level 1–5).</li>
+  <li><strong>Sponsor:</strong> fest 20.000 €.</li>
+  <li><strong>Siegprämie:</strong> 8.000 €, nur bei einem Sieg.</li>
+  <li><strong>Fanshop:</strong> feste, reputationsabhängige Einnahme je nach Fanshop-Level (0–21.000 €).</li>
+  <li><strong>Catering:</strong> ein Prozentsatz der Zuschauereinnahme dieses Matches, steigend von 5 % (Level 1) bis 23 % (Level 5).</li>
+</ul>
+<h3>Reputation</h3>
+<p>Deine Vereinsreputation verändert sich nach jedem Match nach einem Elo-ähnlichen Prinzip: Ein Sieg gegen einen stärker eingeschätzten Gegner bringt mehr Reputation als einer gegen einen schwachen Gegner, und umgekehrt. Reputation fließt direkt in die Zuschauereinnahmen ein. Das Gebäude Öffentlichkeitsarbeit wirkt bewusst asymmetrisch: es verstärkt den Reputationsgewinn bei einem Sieg, dämpft aber den Verlust bei einer Niederlage – kann dir also nie schaden.</p>
+<p>Alle Kassenzahlen des letzten Spieltags sowie eine Vorschau-Berechnung für den kommenden Spieltag findest du gesammelt auf <code>finances.html</code>.</p>
+
+<h2 id="gebaeude">24. Die sieben Gebäude</h2>
+<p>Jedes Gebäude hat einmalige, geometrisch steigende Ausbaukosten sowie laufenden Unterhalt pro Match (auf der jeweiligen Startstufe unterhaltsfrei).</p>
+<dl>
+  <dt>Trainingscenter (Start: Level 1)</dt>
+  <dd>Mehr Trainings-Slots und eine höhere Attribut-Obergrenze (Abschnitt 20). Ausbau bis Level 3, Kosten 50.000 € / 125.000 €, Unterhalt bis 16.000 €.</dd>
+  <dt>Akademie (Start: Level 1)</dt>
+  <dd>Mehr Theorie-Slots und ein höheres Skill-Limit (Abschnitt 20). Gleiche Kostenstruktur wie das Trainingscenter.</dd>
+  <dt>Medizinische Abteilung (Start: Level 1)</dt>
+  <dd>Mehr Behandlungsplätze, schnellere Heilung, gedämpfter Alters-Verfall (Abschnitt 21/22). Ausbau bis Level 3, Kosten 35.000 € / 90.000 €, Unterhalt bis 11.000 €.</dd>
+  <dt>Stadion (Start: Level 1, jeder Verein braucht eine Spielstätte)</dt>
+  <dd>Größerer Zuschauer-Würfel, damit höhere Einnahmen – und zugleich die Obergrenze, bis zu welchem Level Fanshop und Catering ausgebaut werden dürfen. Ausbau bis Level 5, Kosten von 60.000 € bis 900.000 €, Unterhalt bis 67.000 €.</dd>
+  <dt>Fanshop (Start: Level 0)</dt>
+  <dd>Feste Zusatzeinnahme pro Match. Ausbau bis Level 5 (begrenzt durch das Stadion-Level), Kosten von 15.000 € bis 585.000 €, Unterhalt bis 17.400 €.</dd>
+  <dt>Catering (Start: Level 0)</dt>
+  <dd>Prozentuale Zusatzeinnahme auf die Zuschauereinnahme. Ausbau bis Level 5 (ebenfalls durch das Stadion-Level begrenzt), Kosten von 5.000 € bis 190.000 €, Unterhalt bis 5.300 €.</dd>
+  <dt>Öffentlichkeitsarbeit (Start: Level 0)</dt>
+  <dd>Dämpft Reputationsverluste bei Niederlagen und verstärkt Gewinne bei Siegen. Ausbau bis Level 5, Kosten von 10.000 € bis 375.000 €, Unterhalt bis 35.000 €.</dd>
+</dl>
+<p>Jedes Gebäude hat eine eigene Seite mit aktuellem und künftigem Unterhalt sowie dem Ausbau-Button (Stadion, Fanshop und Catering gebündelt auf <code>stadium.html</code>, sonst <code>training.html</code>, <code>academy.html</code>, <code>medical.html</code>, <code>public-relations.html</code>).</p>
+
+<h2 id="liga">25. Die Liga</h2>
+<p>Statt eines einzelnen festen Gegners spielst du eine <strong>Singleplayer-Liga</strong> mit insgesamt 6 Teams: deinem eigenen Verein plus 5 festen KI-Gegnern (Abschnitt 26).</p>
+<ul>
+  <li><strong>Spielplan:</strong> eine Einfachrunde über 5 Spieltage. Du triffst dabei die 5 Gegner in aufsteigender Stärke-Reihenfolge – Spieltag 1 gegen den schwächsten, Spieltag 5 gegen den stärksten Gegner.</li>
+  <li>Die jeweils zwei übrigen Begegnungen desselben Spieltags (zwischen den anderen KI-Teams) spielst du nicht selbst – sie werden anhand eines Stärke-Ratings automatisch simuliert und beim Verbuchen deines eigenen Ergebnisses festgeschrieben.</li>
+  <li><strong>Tabelle:</strong> 3 Punkte für einen Sieg, 1 für ein Unentschieden, 0 für eine Niederlage. Bei Punktgleichstand entscheiden der Reihe nach: Touchdown-Differenz, erzielte Touchdowns, Verletzungsdifferenz.</li>
+  <li>Nach dem 5. Spieltag ist die Saison abgeschlossen. Über den Button <strong>"Neue Saison"</strong> startest du einen frischen Spielplan gegen dieselben Gegner – dein Kader bleibt bestehen und weiterentwickelt.</li>
+</ul>
+<p>Tabelle und Spielplan findest du mit eigenen Reitern auf <code>league.html</code>; auf <code>next-match.html</code> siehst du vor jedem Spieltag deinen Gegner samt Stärkeanzeige (★).</p>
+
+<h2 id="gegner">26. Gegnervereine &amp; KI-Persönlichkeiten</h2>
+<p>Die fünf KI-Gegner bilden eine feste Stärke-Leiter mit jeweils eigener Start-Reputation und eigenem Spielstil:</p>
+<table>
+<tr><th>Rang</th><th>Verein</th><th>Start-Reputation</th><th>Stil</th></tr>
+<tr><td>1</td><td>Wiesen-Grashüpfer</td><td>50</td><td>Rookies – alles auf Grundwert, nur Startskills, wenig Struktur.</td></tr>
+<tr><td>2</td><td>Grüne Zikaden</td><td>60</td><td>Solide, ausgeglichene Allrounder – dient als Referenz-Team.</td></tr>
+<tr><td>3</td><td>Stahl-Ameisen</td><td>70</td><td>Defensiv und ruppig – "Klump"-Stil, wenig Markierung, hohe Risikobereitschaft beim Blocken/Foulen.</td></tr>
+<tr><td>4</td><td>Sturm-Wespen</td><td>80</td><td>Schnell &amp; aggressiv – viel Agilität, punktet blitzschnell, dünn in Stärke/Block.</td></tr>
+<tr><td>5</td><td>Königinnengarde</td><td>90</td><td>Elite – Attribute nahe Maximum, mehrere Skills pro Spieler, auf hohem Niveau in allem stark.</td></tr>
+</table>
+<p>Jedes gegnerische Team steuert seine Spieler nicht nur nach Distanz, sondern nach einem echten Team-Plan pro Zug: Wer sichert den Ball, wer schützt den Ballträger, wer markiert deine gefährlichsten Spieler. Fünf Persönlichkeitsparameter (u.a. wie sehr das Team seinen Ballträger schützt, wie stark es markiert statt pauschal vorzurücken, wie risikofreudig es blockt und fault) sorgen dafür, dass sich die Gegner spürbar unterschiedlich anfühlen – die Stahl-Ameisen spielen erkennbar ruppiger und weniger organisiert als etwa die taktisch disziplinierte Königinnengarde.</p>
+
+<h2 id="nach-dem-spiel">27. Nach dem Spiel &amp; Einstellungen</h2>
+<p>Nach jedem echten Match zeigt das Kernspiel direkt einen Auswertungsbildschirm: Endstand, Touchdown-Verlauf, eine kombinierte Spielerliste beider Teams mit Match-Statistik (für deine eigenen Spieler zusätzlich Reps/EP), die vollständige Kassenabrechnung dieses Matches, eine MVP-Hervorhebung sowie Hinweise zu Verletzungen, Zwangsrenten und neu fürs Training angemeldeten Spielern.</p>
+<p>Auf <code>settings.html</code> lassen sich fast alle Regel- und Wirtschaftsparameter aus dieser Anleitung (Training, Alterung, Medizin, EP, Ökonomie, Kadergrößen) direkt anpassen – nützlich, wenn dir das Spiel zu leicht, zu schwer oder zu langsam vorkommt. Die Verletzungsschwere-Tabelle (Abschnitt 22) bleibt dabei bewusst außen vor, da sie Würfelformeln statt einfacher Zahlen enthält. Ein Klick auf "Zurücksetzen auf Standard" macht alle Änderungen rückgängig.</p>
+
+<h2 id="ausblick">28. Stand &amp; Ausblick</h2>
+<p>Diese Anleitung beschreibt den vollständigen aktuellen Stand von Kernspiel und Manager (Kader, Training, Alterung, Verletzungen, Ökonomie, sieben Gebäude, Singleplayer-Liga mit fünf KI-Gegnern samt eigener Persönlichkeit). Bewusst noch nicht umgesetzt ist eine echte <strong>Online-Liga gegen andere Menschen</strong> mit Accounts – das Spiel bleibt vorerst ein Singleplayer-Prototyp, bei dem jeder Browser seinen eigenen, unabhängigen Spielstand führt. Ebenfalls offen: unterschiedliche Ausrüstungsvarianten (Abschnitt 5), Trainingsgebäude-Level 4–5, und flexible Startformationen.</p>
+
+</body>
+</html>
