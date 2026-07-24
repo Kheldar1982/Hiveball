@@ -23,12 +23,37 @@
     align-items: center;
     padding: 16px;
   }
-  h1 { font-size: 1.3rem; margin: 4px 0 12px; letter-spacing: 0.5px; }
+  h1 { font-size: 1.3rem; margin: 0; letter-spacing: 0.5px; }
+  #top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    max-width: 1100px;
+    margin: 4px 0 10px;
+  }
+  #header-bar {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 16px;
+    width: 100%;
+    max-width: 1100px;
+    margin-bottom: 12px;
+  }
   #wrap {
     display: flex;
     gap: 16px;
     flex-wrap: wrap;
     justify-content: center;
+    width: 100%;
+    max-width: 1100px;
+  }
+  #log-panel {
+    width: 100%;
+    max-width: 1100px;
+    margin-top: 16px;
   }
   #board-panel {
     background: var(--panel);
@@ -105,6 +130,71 @@
   #preview b { color: var(--accent); }
   #preview .chance-good { color: #6ee787; font-weight: 700; }
   #preview .chance-bad { color: #ff8787; font-weight: 700; }
+
+  /* Spieler-Info-Panel (rechts vom Spielfeld): Name/Icon, Attribute, Skills
+     des gerade aktivierten Spielers - siehe renderPlayerInfoPanel(). */
+  #player-info {
+    background: #0f1720;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px 12px;
+    min-height: 118px;
+  }
+  .pi-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 4px;
+  }
+  .pi-icon { font-size: 1.3rem; }
+  .pi-sub { color: #9fb0bd; font-size: 0.8rem; margin-bottom: 8px; }
+  .pi-attrs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px 8px;
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+  }
+  .pi-attr b { color: var(--accent); margin-right: 4px; }
+  .pi-skills { display: flex; flex-wrap: wrap; gap: 4px; }
+  .skill-badge {
+    background: rgba(242,183,5,0.14);
+    color: var(--accent);
+    border: 1px solid rgba(242,183,5,0.4);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    cursor: help;
+  }
+  .hint-small { color: #9fb0bd; font-size: 0.85rem; margin: 0; }
+
+  /* Hilfe-Overlay (Steuerung/Attribute/Würfel/... - vormals inline im Seitenpanel) */
+  #help-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(6, 10, 15, 0.82);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 50;
+  }
+  #help-overlay[hidden] { display: none; }
+  #help-panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px 24px;
+    max-width: 640px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  #help-panel h2 { margin-top: 0; }
+  #help-panel button { margin-top: 16px; }
+
   button {
     background: var(--accent);
     color: #1a1300;
@@ -207,7 +297,25 @@
 </head>
 <body>
 
-<h1>🏈 Hiveball – Kernspiel-Prototyp</h1>
+<div id="top-bar">
+  <h1>🏈 Hiveball – Kernspiel-Prototyp</h1>
+  <button id="btn-help" class="secondary">❓ Hilfe</button>
+</div>
+
+<div id="header-bar">
+  <div class="score-row">
+    <span class="team-blue" id="team-blue-name">Blau (Du)</span>
+    <span id="score-blue">0</span>
+  </div>
+  <div class="score-row">
+    <span class="team-red" id="team-red-name">Rot (KI)</span>
+    <span id="score-red">0</span>
+  </div>
+  <div class="turns-row">
+    <span id="turns-blue">Züge: 0/10</span>
+    <span id="turns-red">Züge: 0/10</span>
+  </div>
+</div>
 
 <div id="wrap">
   <div id="board-panel">
@@ -215,20 +323,11 @@
   </div>
 
   <div id="side-panel">
-    <div class="score-row">
-      <span class="team-blue">Blau (Du)</span>
-      <span id="score-blue">0</span>
-    </div>
-    <div class="score-row">
-      <span class="team-red" id="team-red-name">Rot (KI)</span>
-      <span id="score-red">0</span>
-    </div>
-    <div class="turns-row">
-      <span id="turns-blue">Züge: 0/10</span>
-      <span id="turns-red">Züge: 0/10</span>
-    </div>
-
     <div id="status">Wähle einen blauen Spieler aus.</div>
+
+    <div id="player-info">
+      <p class="hint-small">Kein Spieler ausgewählt.</p>
+    </div>
 
     <button id="btn-block" disabled>Block ausführen</button>
     <button id="btn-foul" disabled>Foul</button>
@@ -236,9 +335,16 @@
     <button id="btn-endturn" class="secondary">Zug beenden</button>
 
     <div id="preview">Fahre mit der Maus über ein Feld oder einen Spieler, um die Erfolgschancen zu sehen.</div>
+  </div>
+</div>
 
-    <div id="log"></div>
+<div id="log-panel">
+  <div id="log"></div>
+</div>
 
+<div id="help-overlay" hidden>
+  <div id="help-panel">
+    <h2>Hilfe</h2>
     <div class="legend">
       <b>Steuerung:</b><br>
       1. Spieler anklicken (blau, nicht erschöpft)<br>
@@ -262,6 +368,7 @@
       <br><br>
       <b>Spielende:</b> Sieg sofort bei 3 Touchdowns. Sonst endet das Spiel, wenn beide Teams je 10 Züge absolviert haben – dann gewinnt das Team mit mehr Touchdowns, bei Gleichstand ist es ein Unentschieden.
     </div>
+    <button id="help-ok">OK</button>
   </div>
 </div>
 
@@ -651,7 +758,7 @@ function loadBlueRosterFromManager() {
   if (starters.length !== 5) return null;
 
   const bench = club.lastMatchNomination.bench.map(byId).filter(Boolean);
-  return { starters, bench };
+  return { name: club.name, starters, bench };
 }
 
 // Rot (KI): lädt den Gegner des aktuellen Liga-Spieltags (opponents.js) über den
@@ -684,6 +791,7 @@ function setupTeams() {
   if (blueRoster) {
     ys.forEach((y, i) => players.push(createPlayer(id++, i + 1, TEAM_BLUE, blueRoster.starters[i].position, 2, y, blueRoster.starters[i])));
     blueRoster.bench.forEach(mp => benchPlayers.push({ team: TEAM_BLUE, position: mp.position, managerPlayer: mp }));
+    teams[TEAM_BLUE].name = blueRoster.name;
   } else {
     ys.forEach((y, i) => players.push(createPlayer(id++, i + 1, TEAM_BLUE, TEAM_ROSTER[i], 2, y)));
   }
@@ -703,6 +811,8 @@ function setupTeams() {
     redPersonality = DEFAULT_AI_PERSONALITY;
   }
 
+  const blueNameEl = document.getElementById('team-blue-name');
+  if (blueNameEl) blueNameEl.textContent = `${teams[TEAM_BLUE].name} (Du)`;
   const redNameEl = document.getElementById('team-red-name');
   if (redNameEl) redNameEl.textContent = `${teams[TEAM_RED].name} (KI)`;
 }
@@ -1359,6 +1469,7 @@ function checkScore(player) {
 function endGame(message) {
   gameEnded = true;
   selectedPlayerId = null;
+  renderPlayerInfoPanel(null);
   passMode = false;
   log(`🏁 ${message}`);
   setStatus(`🏁 ${message}`);
@@ -2113,6 +2224,7 @@ function endTurn(forced) {
   updateScoreboard();
 
   selectedPlayerId = null;
+  renderPlayerInfoPanel(null);
   passMode = false;
   document.getElementById('btn-block').disabled = true;
   document.getElementById('btn-foul').disabled = true;
@@ -2733,6 +2845,73 @@ function updateActionButtons(p) {
   document.getElementById('btn-block').disabled = !canBlock || p.acted;
   document.getElementById('btn-foul').disabled = !canFoul || p.acted || foulUsedThisTurn;
   document.getElementById('btn-pass').disabled = !(ball.carrierId === p.id) || p.acted;
+  renderPlayerInfoPanel(p);
+}
+
+// Zeigt Name, Attribute und Skills des gerade aktivierten Spielers im
+// Seitenpanel (rechts vom Spielfeld) - p ist null, wenn kein Spieler
+// ausgewählt ist (siehe endTurn/endGame). Baut das DOM rein über
+// createElement/textContent statt innerHTML auf: p.name kommt aus dem
+// Manager-Teil und ist vom Nutzer frei umbenennbar (siehe state.js), daher
+// nie ungeprüft in innerHTML interpolieren.
+function renderPlayerInfoPanel(p) {
+  const container = document.getElementById('player-info');
+  container.innerHTML = '';
+
+  if (!p) {
+    const hint = document.createElement('p');
+    hint.className = 'hint-small';
+    hint.textContent = 'Kein Spieler ausgewählt.';
+    container.appendChild(hint);
+    return;
+  }
+
+  const icon = (POSITIONS[p.position] && POSITIONS[p.position].icon) || '❓';
+  const header = document.createElement('div');
+  header.className = 'pi-header';
+  const iconSpan = document.createElement('span');
+  iconSpan.className = 'pi-icon';
+  iconSpan.textContent = icon;
+  header.appendChild(iconSpan);
+  header.appendChild(document.createTextNode(`#${p.number} ${p.name}`));
+  container.appendChild(header);
+
+  const sub = document.createElement('div');
+  sub.className = 'pi-sub';
+  sub.textContent = `${p.position} · ${teams[p.team].name}`;
+  container.appendChild(sub);
+
+  const attrsDiv = document.createElement('div');
+  attrsDiv.className = 'pi-attrs';
+  const attrs = [['MR', p.mr], ['BL', p.bl], ['ST', p.st], ['CO', p.co], ['AG', p.ag], ['PA', p.pa]];
+  for (const [label, val] of attrs) {
+    const cell = document.createElement('div');
+    cell.className = 'pi-attr';
+    const b = document.createElement('b');
+    b.textContent = label;
+    cell.appendChild(b);
+    cell.appendChild(document.createTextNode(String(val)));
+    attrsDiv.appendChild(cell);
+  }
+  container.appendChild(attrsDiv);
+
+  const skillsDiv = document.createElement('div');
+  skillsDiv.className = 'pi-skills';
+  if (p.skills.length === 0) {
+    const hint = document.createElement('span');
+    hint.className = 'hint-small';
+    hint.textContent = 'Keine Skills';
+    skillsDiv.appendChild(hint);
+  } else {
+    for (const skill of p.skills) {
+      const badge = document.createElement('span');
+      badge.className = 'skill-badge';
+      badge.textContent = skill;
+      if (SKILLS[skill]) badge.title = SKILLS[skill];
+      skillsDiv.appendChild(badge);
+    }
+  }
+  container.appendChild(skillsDiv);
 }
 
 /* ============================================================
@@ -3073,6 +3252,13 @@ document.getElementById('btn-pass').addEventListener('click', () => {
 });
 
 document.getElementById('btn-endturn').addEventListener('click', () => endTurn(false));
+
+document.getElementById('btn-help').addEventListener('click', () => {
+  document.getElementById('help-overlay').hidden = false;
+});
+document.getElementById('help-ok').addEventListener('click', () => {
+  document.getElementById('help-overlay').hidden = true;
+});
 
 /* ============================================================
    ANSTOSS-WURF (nur zu Spielbeginn – nach Touchdowns bleibt die
