@@ -2411,19 +2411,33 @@ function findBestHandoffTarget(carrier) {
 // bisherigen Eskorten-Logik) - der Blau-Spieler, der dieses Feld am ehesten
 // noch erreichen und dort blocken könnte (Reichweite mr+1, wie
 // isThreatenedPosition an anderer Stelle bereits annimmt).
-function findBiggestCarrierThreat(carrier) {
+// Slice D: liefert bis zu maxCount Bedrohungen (statt nur die eine größte), sortiert
+// nach Bedrohungswert - damit ein hohes cagePriority bei mehreren echten Bedrohungen
+// auch mehrere Blocker anfordern kann (siehe computeAiPlan Käfig-Abschnitt).
+function findCarrierThreats(carrier, maxCount) {
   const dir = teams[TEAM_RED].endzoneCol > carrier.x ? 1 : -1;
   const aheadX = clamp(carrier.x + dir * 2, 0, COLS - 1);
-  let best = null;
+  const threats = [];
   for (const b of players) {
     if (b.team !== TEAM_BLUE || b.prone || b.injured) continue;
     const dist = chebyshev(b.x, b.y, aheadX, carrier.y);
     const reach = b.mr + 1;
     if (dist > reach) continue;
-    const score = reach - dist;
-    if (!best || score > best.score) best = { id: b.id, score };
+    threats.push({ id: b.id, score: reach - dist });
   }
-  return best ? best.id : null;
+  threats.sort((a, b) => b.score - a.score);
+  return threats.slice(0, maxCount);
+}
+
+// Abfangpunkt vor dem gegnerischen Ballträger (Slice D): Punkt 2 Felder voraus in
+// dessen Laufrichtung Richtung Blau-Endzone, statt der aktuellen Trägerposition - ein
+// Verfolger, der dorthin läuft statt hinterherzujagen, kann den Träger eher abschneiden.
+// Kein Reichweitenfilter wie bei findCarrierThreats (dort geht es um "lohnt sich das
+// Wegblocken überhaupt", hier einfach ums bessere Zielfeld für die Chaser-Zuweisung).
+function carrierInterceptPoint(carrier) {
+  const dir = teams[TEAM_BLUE].endzoneCol > carrier.x ? 1 : -1;
+  const aheadX = clamp(carrier.x + dir * 2, 0, COLS - 1);
+  return { x: aheadX, y: carrier.y };
 }
 
 // Eskorten-Zielpunkte relativ zum eigenen Ballträger (dir = Laufrichtung
@@ -2474,14 +2488,22 @@ function computeAiPlan(cageRoll) {
 
   const passTargetId = weCarry ? findBestHandoffTarget(carrier) : null;
 
-  let cageBlockerId = null;
-  let cageTargetId = null;
+  // Käfig-Schutz (Slice D: bedrohungsskaliert statt fix ein Blocker): bei hohem
+  // cagePriority werden bis zu 2 Blocker gegen die größten echten Bedrohungen
+  // abgestellt statt immer nur einer - Stahl-Ameisen (cagePriority=0) bekommen dadurch
+  // weiterhin nie Käfigschutz, Königinnengarde (0.85) kann bei zwei realen Bedrohungen
+  // jetzt auch beide abdecken.
+  const cageAssignments = new Map(); // redId -> blaue Bedrohungs-Id
   if (weCarry && cageRoll < redPersonality.cagePriority) {
-    cageTargetId = findBiggestCarrierThreat(carrier);
-    if (cageTargetId) {
-      const threat = players.find(b => b.id === cageTargetId);
-      const candidate = nearestAvailable(redPlayers, reserved, threat.x, threat.y);
-      if (candidate) { cageBlockerId = candidate.id; reserved.add(cageBlockerId); }
+    const maxCage = redPersonality.cagePriority > 0.7 ? 2 : 1;
+    const threats = findCarrierThreats(carrier, maxCage);
+    for (const threat of threats) {
+      const threatPlayer = players.find(b => b.id === threat.id);
+      const candidate = nearestAvailable(redPlayers, reserved, threatPlayer.x, threatPlayer.y);
+      if (candidate) {
+        cageAssignments.set(candidate.id, threat.id);
+        reserved.add(candidate.id);
+      }
     }
   }
 
@@ -2501,15 +2523,22 @@ function computeAiPlan(cageRoll) {
     }
   }
 
-  const chaserIds = [];
+  // Slice D: der nächste verfügbare Chaser läuft auf den Abfangpunkt vor dem Träger
+  // zu (siehe carrierInterceptPoint) statt ihm hinterherzulaufen; ein eventueller
+  // zweiter Chaser (Klump-Stil, s.u.) bleibt bewusst auf der aktuellen Trägerposition
+  // - erhält den Dogpile-Charakter für diese Teams, gibt disziplinierten Teams aber
+  // die Abschneide-Taktik.
+  const chaserAssignments = new Map(); // redId -> Zielpunkt {x,y}
   if (theyCarry) {
     // Niedriges markingFocus = "Klump"-Stil: lieber zu zweit auf den
     // Ballträger drauf statt einen zweiten Spieler sauber markieren zu lassen.
     const chaserCount = redPersonality.markingFocus < 0.4 ? 2 : 1;
+    const interceptPoint = carrierInterceptPoint(carrier);
     for (let i = 0; i < chaserCount; i++) {
-      const c = nearestAvailable(redPlayers, reserved, carrier.x, carrier.y);
+      const target = i === 0 ? interceptPoint : { x: carrier.x, y: carrier.y };
+      const c = nearestAvailable(redPlayers, reserved, target.x, target.y);
       if (!c) break;
-      chaserIds.push(c.id);
+      chaserAssignments.set(c.id, target);
       reserved.add(c.id);
     }
   }
@@ -2518,7 +2547,7 @@ function computeAiPlan(cageRoll) {
   const maxMarkers = Math.round(redPersonality.markingFocus * markPool.length);
   const markAssignments = computeMarkAssignments(markPool, maxMarkers, carrier);
 
-  return { weCarry, theyCarry, looseBall, carrier, retrieverId, passTargetId, cageBlockerId, cageTargetId, escortAssignments, chaserIds, markAssignments };
+  return { weCarry, theyCarry, looseBall, carrier, retrieverId, passTargetId, cageAssignments, escortAssignments, chaserAssignments, markAssignments };
 }
 
 function aiChooseDestination(p) {
@@ -2546,8 +2575,9 @@ function aiChooseDestination(p) {
 
   const carrier = players.find(x => x.id === ball.carrierId);
   if (carrier.team === TEAM_RED) {
-    if (plan && plan.cageBlockerId === p.id && plan.cageTargetId) {
-      const threat = players.find(b => b.id === plan.cageTargetId);
+    if (plan) {
+      const cageTargetId = plan.cageAssignments.get(p.id);
+      const threat = cageTargetId && players.find(b => b.id === cageTargetId);
       if (threat) return nearestFreeCellNear(threat.x, threat.y, p.x, p.y) || { x: threat.x, y: threat.y };
     }
     if (plan) {
@@ -2571,8 +2601,9 @@ function aiChooseDestination(p) {
 
   // Gegnerischer Ballträger
   if (plan) {
-    if (plan.chaserIds.includes(p.id)) {
-      return nearestFreeCellNear(carrier.x, carrier.y, p.x, p.y) || { x: carrier.x, y: carrier.y };
+    const chaseTarget = plan.chaserAssignments.get(p.id);
+    if (chaseTarget) {
+      return nearestFreeCellNear(chaseTarget.x, chaseTarget.y, p.x, p.y) || chaseTarget;
     }
     const markTargetId = plan.markAssignments.get(p.id);
     const target = markTargetId && players.find(b => b.id === markTargetId);
@@ -2613,6 +2644,19 @@ function findRiskiestTackle(p, stepX, stepY, threshold) {
   return worst.dodgeChance < threshold ? worst : null;
 }
 
+// Blockchance von p gegen e, inkl. Unterstützungsboni (Teamkameraden in der jeweiligen
+// Tacklezone, siehe getBlockAssists/resolveBlock), Bewegungsabzug, Block-Skill und
+// Dodge-Ausweichwert. Kernrechnung für findBestBlockOption/chooseAiBlockTarget.
+function blockChanceAgainst(p, e) {
+  const bonusP = getBlockAssists(p, e).reduce((s, a) => s + a.bonus, 0);
+  const bonusE = getBlockAssists(e, p).reduce((s, a) => s + a.bonus, 0);
+  const eBaseAttr = hasSkill(e, 'Dodge') ? e.ag : e.bl;
+  return opposedChance(
+    p.bl + bonusP - movementBlockPenalty(p) + (hasSkill(p, 'Block') ? 1 : 0),
+    eBaseAttr + bonusE + (hasSkill(e, 'Block') ? 1 : 0)
+  );
+}
+
 // Sucht unter den direkt angrenzenden Gegnern denjenigen mit der besten Blockchance für p.
 function findBestBlockOption(p) {
   const adjEnemies = players.filter(e => e.team !== p.team && !e.prone && !e.injured && isAdjacent(p, e));
@@ -2620,18 +2664,25 @@ function findBestBlockOption(p) {
 
   let best = null;
   adjEnemies.forEach(e => {
-    // Unterstützungsboni mit einrechnen, sonst würde die KI Blocks falsch einschätzen,
-    // sobald Teamkameraden mit unterstützen (siehe getBlockAssists/resolveBlock).
-    const bonusP = getBlockAssists(p, e).reduce((s, a) => s + a.bonus, 0);
-    const bonusE = getBlockAssists(e, p).reduce((s, a) => s + a.bonus, 0);
-    const eBaseAttr = hasSkill(e, 'Dodge') ? e.ag : e.bl;
-    const blockChance = opposedChance(
-      p.bl + bonusP - movementBlockPenalty(p) + (hasSkill(p, 'Block') ? 1 : 0),
-      eBaseAttr + bonusE + (hasSkill(e, 'Block') ? 1 : 0)
-    );
+    const blockChance = blockChanceAgainst(p, e);
     if (!best || blockChance > best.blockChance) best = { enemy: e, blockChance };
   });
   return best;
+}
+
+// KI-Blockzielwahl (Slice D): statt "Ballträger falls angrenzend, sonst der erste im
+// Array" wird nach echtem Wert gewählt - Blockchance plus ein Bonus fürs Treffen des
+// Ballträgers, skaliert mit redPersonality.riskTolerance (risikofreudige Teams gehen
+// den Ballträger auch bei schlechterer Chance gezielt an, vorsichtige Teams wählen
+// das sicherste Matchup).
+function chooseAiBlockTarget(p, adjEnemies) {
+  let best = null;
+  adjEnemies.forEach(e => {
+    const carrierBonus = e.id === ball.carrierId ? redPersonality.riskTolerance * 0.3 : 0;
+    const score = blockChanceAgainst(p, e) + carrierBonus;
+    if (!best || score > best.score) best = { enemy: e, score };
+  });
+  return best.enemy;
 }
 
 // Ermittelt den Punkt auf 'path', den p nach genau 'steps' Schritten ab seiner
@@ -2823,7 +2874,7 @@ function aiTurn() {
     if (!p.acted) {
       const adjEnemies = players.filter(e => e.team === TEAM_BLUE && !e.prone && !e.injured && isAdjacent(p, e));
       if (adjEnemies.length) {
-        const priority = adjEnemies.find(e => e.id === ball.carrierId) || adjEnemies[0];
+        const priority = chooseAiBlockTarget(p, adjEnemies);
         resolveBlock(p, priority);
         if (gameEnded || currentTeam !== TEAM_RED) return;
       }
