@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Hiveball Manager – Hilfe &amp; Glossar</title>
+<link rel="stylesheet" href="manager.css">
+</head>
+<body>
+<div id="app-header"></div>
+<h1>Hilfe &amp; Glossar</h1>
+<p class="hint">
+  Ausbaupfad aller sieben Gebäude auf einen Blick: Kosten und laufender
+  Unterhalt pro Match sind einmalig für den Ausbau auf dieses Level fällig
+  bzw. gelten ab diesem Level dauerhaft. Diese Übersicht zeigt die feste
+  Spielkonfiguration, nicht den Stand eines bestimmten Vereins.
+</p>
+
+<div id="facilityTables"></div>
+
+<script type="module">
+  import { FACILITIES_INFO, facilityLevelRows } from './facilityInfo.js';
+  import { renderHeader } from './layout.js';
+
+  renderHeader('help');
+
+  const EUR = (n) => `${n.toLocaleString('de-DE')} €`;
+
+  function renderFacilityTable(facility) {
+    const section = document.createElement('section');
+    section.id = facility.key;
+
+    const heading = document.createElement('h2');
+    heading.textContent = `${facility.icon} ${facility.name}`;
+    section.appendChild(heading);
+
+    const table = document.createElement('table');
+    table.innerHTML = '<thead><tr><th>Level</th><th>Kosten</th><th>Unterhalt/Match</th><th>Wirkung</th></tr></thead>';
+    const tbody = document.createElement('tbody');
+
+    for (const row of facilityLevelRows(facility.key)) {
+      const tr = document.createElement('tr');
+      const td = (text) => { const c = document.createElement('td'); c.textContent = text; return c; };
+      tr.appendChild(td(row.level));
+      tr.appendChild(td(row.cost == null ? '– (Start)' : EUR(row.cost)));
+      tr.appendChild(td(EUR(row.upkeep)));
+      tr.appendChild(td(row.effect));
+      tbody.appendChild(tr);
+    }
+
+    table.appendChild(tbody);
+    section.appendChild(table);
+    return section;
+  }
+
+  // Stadion/Fanshop/Catering liegen auf einer gemeinsamen Seite
+  // (stadium.html) und teilen sich hier deshalb auch einen gemeinsamen
+  // Anker ("stadion-gruppe"), damit der Verweis von dort dorthin springt.
+  const container = document.getElementById('facilityTables');
+  const stadionGroup = document.createElement('div');
+  stadionGroup.id = 'stadion-gruppe';
+
+  for (const facility of FACILITIES_INFO) {
+    const table = renderFacilityTable(facility);
+    if (['stadium', 'fanshop', 'catering'].includes(facility.key)) {
+      stadionGroup.appendChild(table);
+      if (!stadionGroup.isConnected) container.appendChild(stadionGroup);
+    } else {
+      container.appendChild(table);
+    }
+  }
+</script>
+</body>
+</html>

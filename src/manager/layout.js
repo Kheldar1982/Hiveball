@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { key: 'finances', label: 'Finanzen', href: 'finances.html' },
   { key: 'hall-of-fame', label: 'Hall of Fame', href: 'hall-of-fame.html' },
   { key: 'settings', label: 'Einstellungen', href: 'settings.html' },
+  { key: 'help', label: 'Hilfe', href: 'help.html' },
 ];
 
 export function renderHeader(activeKey) {

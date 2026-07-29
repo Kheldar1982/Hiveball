@@ -17,6 +17,7 @@
     <div class="card"><h3>Kasse</h3><div class="value" id="money"></div></div>
     <div class="card"><h3>Teamwert</h3><div class="value" id="teamValue"></div></div>
     <div class="card"><h3>Kadergröße</h3><div class="value" id="rosterSize"></div></div>
+    <div class="card"><h3>Reputation</h3><div class="value" id="reputation"></div></div>
   </div>
 
   <h3>Gebäude</h3>
@@ -71,6 +72,7 @@
     el('money').textContent = `${club.money} €`;
     el('teamValue').textContent = `${teamValue} €`;
     el('rosterSize').textContent = `${roster.length} / ${defaultLeagueConfig.roster.maxClubSize}`;
+    el('reputation').textContent = club.reputation.toFixed(1);
 
     const facilityBody = el('facilityBody');
     for (const key of Object.keys(FACILITY_LABELS)) {

@@ -347,23 +347,91 @@
 <p>Alle Kassenzahlen des letzten Spieltags sowie eine Vorschau-Berechnung für den kommenden Spieltag findest du gesammelt auf <code>finances.html</code>.</p>
 
 <h2 id="gebaeude">24. Die sieben Gebäude</h2>
-<p>Jedes Gebäude hat einmalige, geometrisch steigende Ausbaukosten sowie laufenden Unterhalt pro Match (auf der jeweiligen Startstufe unterhaltsfrei).</p>
-<dl>
-  <dt>Trainingscenter (Start: Level 1)</dt>
-  <dd>Mehr Trainings-Slots und eine höhere Attribut-Obergrenze (Abschnitt 20). Ausbau bis Level 3, Kosten 50.000 € / 125.000 €, Unterhalt bis 16.000 €.</dd>
-  <dt>Akademie (Start: Level 1)</dt>
-  <dd>Mehr Theorie-Slots und ein höheres Skill-Limit (Abschnitt 20). Gleiche Kostenstruktur wie das Trainingscenter.</dd>
-  <dt>Medizinische Abteilung (Start: Level 1)</dt>
-  <dd>Mehr Behandlungsplätze, schnellere Heilung, gedämpfter Alters-Verfall (Abschnitt 21/22). Ausbau bis Level 3, Kosten 35.000 € / 90.000 €, Unterhalt bis 11.000 €.</dd>
-  <dt>Stadion (Start: Level 1, jeder Verein braucht eine Spielstätte)</dt>
-  <dd>Größerer Zuschauer-Würfel, damit höhere Einnahmen – und zugleich die Obergrenze, bis zu welchem Level Fanshop und Catering ausgebaut werden dürfen. Ausbau bis Level 5, Kosten von 60.000 € bis 900.000 €, Unterhalt bis 67.000 €.</dd>
-  <dt>Fanshop (Start: Level 0)</dt>
-  <dd>Feste Zusatzeinnahme pro Match. Ausbau bis Level 5 (begrenzt durch das Stadion-Level), Kosten von 15.000 € bis 585.000 €, Unterhalt bis 17.400 €.</dd>
-  <dt>Catering (Start: Level 0)</dt>
-  <dd>Prozentuale Zusatzeinnahme auf die Zuschauereinnahme. Ausbau bis Level 5 (ebenfalls durch das Stadion-Level begrenzt), Kosten von 5.000 € bis 190.000 €, Unterhalt bis 5.300 €.</dd>
-  <dt>Öffentlichkeitsarbeit (Start: Level 0)</dt>
-  <dd>Dämpft Reputationsverluste bei Niederlagen und verstärkt Gewinne bei Siegen. Ausbau bis Level 5, Kosten von 10.000 € bis 375.000 €, Unterhalt bis 35.000 €.</dd>
-</dl>
+<p>Jedes Gebäude hat einmalige, geometrisch steigende Ausbaukosten sowie laufenden Unterhalt pro Match (auf der jeweiligen Startstufe unterhaltsfrei). Dieselben Tabellen gibt es auch interaktiv im Manager selbst, siehe <code>help.html</code> ("Hilfe" in der Navigation).</p>
+
+<h3>Trainingscenter</h3>
+<table>
+<thead><tr><th>Level</th><th>Kosten</th><th>Unterhalt/Match</th><th>Wirkung</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>– (Start)</td><td>0 €</td><td>3 Trainings-Slots, Attribut-Obergrenze Positions-Grundwert + 1</td></tr>
+<tr><td>2</td><td>50.000 €</td><td>7.000 €</td><td>5 Trainings-Slots, Grundwert + 2</td></tr>
+<tr><td>3</td><td>125.000 €</td><td>16.000 €</td><td>7 Trainings-Slots (Doppeltraining möglich), Grundwert + 3</td></tr>
+</tbody>
+</table>
+
+<h3>Akademie</h3>
+<table>
+<thead><tr><th>Level</th><th>Kosten</th><th>Unterhalt/Match</th><th>Wirkung</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>– (Start)</td><td>0 €</td><td>2 Theorie-Slots, Skill-Limit 1</td></tr>
+<tr><td>2</td><td>50.000 €</td><td>7.000 €</td><td>4 Theorie-Slots, Skill-Limit 2</td></tr>
+<tr><td>3</td><td>125.000 €</td><td>16.000 €</td><td>6 Theorie-Slots, Skill-Limit 3</td></tr>
+</tbody>
+</table>
+<p class="hint">Das Skill-Limit erhöht sich zusätzlich um je 1 pro erreichter Alterphase ab Peak (Abschnitt 21), unabhängig vom Akademie-Level.</p>
+
+<h3>Medizinische Abteilung</h3>
+<table>
+<thead><tr><th>Level</th><th>Kosten</th><th>Unterhalt/Match</th><th>Wirkung</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>– (Start)</td><td>0 €</td><td>1 Behandlungsplatz, Heilung 2 Spiele Ausfallzeit/Match</td></tr>
+<tr><td>2</td><td>35.000 €</td><td>5.000 €</td><td>2 Behandlungsplätze, Heilung 3/Match, Alters-Verfallchance −10 %, Phasenübergang +2 Spiele verzögert</td></tr>
+<tr><td>3</td><td>90.000 €</td><td>11.000 €</td><td>3 Behandlungsplätze, Heilung 4/Match, Alters-Verfallchance −20 %, Phasenübergang +4 Spiele verzögert</td></tr>
+</tbody>
+</table>
+
+<h3>Stadion</h3>
+<p>Jeder Verein braucht eine Spielstätte, daher kein Level 0. Der Zuschauer-Würfel bestimmt zusammen mit der Reputation die Zuschauereinnahme (Abschnitt 23); das Stadion-Level ist zugleich die Obergrenze, bis zu welcher Fanshop und Catering ausgebaut werden dürfen.</p>
+<table>
+<thead><tr><th>Level</th><th>Kosten</th><th>Unterhalt/Match</th><th>Wirkung</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>– (Start)</td><td>0 €</td><td>Zuschauer-Würfel W6, Fanshop/Catering bis Level 1</td></tr>
+<tr><td>2</td><td>60.000 €</td><td>6.000 €</td><td>W8, Fanshop/Catering bis Level 2</td></tr>
+<tr><td>3</td><td>150.000 €</td><td>13.500 €</td><td>W10, bis Level 3</td></tr>
+<tr><td>4</td><td>375.000 €</td><td>37.000 €</td><td>W15, bis Level 4</td></tr>
+<tr><td>5</td><td>900.000 €</td><td>67.000 €</td><td>W20, bis Level 5</td></tr>
+</tbody>
+</table>
+
+<h3>Fanshop</h3>
+<table>
+<thead><tr><th>Level</th><th>Kosten</th><th>Unterhalt/Match</th><th>Wirkung</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>–</td><td>0 €</td><td>keine Zusatzeinnahme (noch nicht gebaut)</td></tr>
+<tr><td>1</td><td>15.000 €</td><td>0 €</td><td>3.000 € / Match</td></tr>
+<tr><td>2</td><td>40.000 €</td><td>3.500 €</td><td>6.000 € / Match</td></tr>
+<tr><td>3</td><td>95.000 €</td><td>8.200 €</td><td>10.000 € / Match</td></tr>
+<tr><td>4</td><td>235.000 €</td><td>12.000 €</td><td>15.000 € / Match</td></tr>
+<tr><td>5</td><td>585.000 €</td><td>17.400 €</td><td>21.000 € / Match</td></tr>
+</tbody>
+</table>
+
+<h3>Catering</h3>
+<table>
+<thead><tr><th>Level</th><th>Kosten</th><th>Unterhalt/Match</th><th>Wirkung</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>–</td><td>0 €</td><td>kein Catering-Bonus</td></tr>
+<tr><td>1</td><td>5.000 €</td><td>0 €</td><td>+5 % der Zuschauereinnahme</td></tr>
+<tr><td>2</td><td>12.000 €</td><td>1.300 €</td><td>+8 %</td></tr>
+<tr><td>3</td><td>30.000 €</td><td>2.700 €</td><td>+12 %</td></tr>
+<tr><td>4</td><td>75.000 €</td><td>3.700 €</td><td>+17 %</td></tr>
+<tr><td>5</td><td>190.000 €</td><td>5.300 €</td><td>+23 %</td></tr>
+</tbody>
+</table>
+
+<h3>Öffentlichkeitsarbeit</h3>
+<table>
+<thead><tr><th>Level</th><th>Kosten</th><th>Unterhalt/Match</th><th>Wirkung</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>–</td><td>0 €</td><td>kein PR-Bonus</td></tr>
+<tr><td>1</td><td>10.000 €</td><td>0 €</td><td>Sieg-Gewinn +10 %, Niederlage-Verlust um 10 % gedämpft</td></tr>
+<tr><td>2</td><td>25.000 €</td><td>3.000 €</td><td>±20 %</td></tr>
+<tr><td>3</td><td>60.000 €</td><td>7.000 €</td><td>±30 %</td></tr>
+<tr><td>4</td><td>150.000 €</td><td>16.000 €</td><td>±40 %</td></tr>
+<tr><td>5</td><td>375.000 €</td><td>35.000 €</td><td>±50 %</td></tr>
+</tbody>
+</table>
+
 <p>Jedes Gebäude hat eine eigene Seite mit aktuellem und künftigem Unterhalt sowie dem Ausbau-Button (Stadion, Fanshop und Catering gebündelt auf <code>stadium.html</code>, sonst <code>training.html</code>, <code>academy.html</code>, <code>medical.html</code>, <code>public-relations.html</code>).</p>
 
 <h2 id="liga">25. Die Liga</h2>

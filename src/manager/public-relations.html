@@ -20,6 +20,8 @@
 
 <div id="view" hidden>
   <p>Kasse: <span class="money" id="clubMoney"></span> €</p>
+  <p>Reputation: <span id="reputation"></span></p>
+  <p class="hint">Alle Ausbaustufen im Überblick: <a href="help.html#publicRelations">Hilfe &amp; Glossar</a></p>
   <div id="facilityUpgrade"></div>
 </div>
 
@@ -36,6 +38,7 @@
 
   function render() {
     el('clubMoney').textContent = club.money.toLocaleString('de-DE');
+    el('reputation').textContent = club.reputation.toFixed(1);
     el('facilityUpgrade').replaceChildren(
       renderFacilityUpgradeRow(club, 'publicRelations', '📣', 'Öffentlichkeitsarbeit', render)
     );

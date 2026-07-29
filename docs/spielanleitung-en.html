@@ -347,23 +347,91 @@
 <p>All financial figures from the last matchday, plus a preview calculation for the upcoming matchday, can be found together on <code>finances.html</code>.</p>
 
 <h2 id="gebaeude">24. The seven facilities</h2>
-<p>Every facility has one-time, geometrically increasing upgrade costs as well as ongoing maintenance per match (free at its starting level).</p>
-<dl>
-  <dt>Training centre (starts at level 1)</dt>
-  <dd>More training slots and a higher attribute cap (section 20). Upgradeable to level 3, costs €50,000 / €125,000, maintenance up to €16,000.</dd>
-  <dt>Academy (starts at level 1)</dt>
-  <dd>More theory slots and a higher skill limit (section 20). Same cost structure as the training centre.</dd>
-  <dt>Medical department (starts at level 1)</dt>
-  <dd>More treatment slots, faster healing, softened age-related decline (sections 21/22). Upgradeable to level 3, costs €35,000 / €90,000, maintenance up to €11,000.</dd>
-  <dt>Stadium (starts at level 1, every club needs a venue)</dt>
-  <dd>A bigger attendance die, meaning higher revenue – and also the cap up to which the fan shop and catering can be upgraded. Upgradeable to level 5, costs from €60,000 to €900,000, maintenance up to €67,000.</dd>
-  <dt>Fan shop (starts at level 0)</dt>
-  <dd>Fixed additional revenue per match. Upgradeable to level 5 (capped by stadium level), costs from €15,000 to €585,000, maintenance up to €17,400.</dd>
-  <dt>Catering (starts at level 0)</dt>
-  <dd>Percentage-based extra revenue on attendance income. Upgradeable to level 5 (also capped by stadium level), costs from €5,000 to €190,000, maintenance up to €5,300.</dd>
-  <dt>Public relations (starts at level 0)</dt>
-  <dd>Softens reputation losses on defeats and boosts gains on wins. Upgradeable to level 5, costs from €10,000 to €375,000, maintenance up to €35,000.</dd>
-</dl>
+<p>Every facility has one-time, geometrically increasing upgrade costs as well as ongoing maintenance per match (free at its starting level). The same tables are also available interactively inside the manager itself, see <code>help.html</code> ("Help" in the navigation).</p>
+
+<h3>Training centre</h3>
+<table>
+<thead><tr><th>Level</th><th>Cost</th><th>Maintenance/match</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>– (start)</td><td>€0</td><td>3 training slots, attribute cap = position base value + 1</td></tr>
+<tr><td>2</td><td>€50,000</td><td>€7,000</td><td>5 training slots, base value + 2</td></tr>
+<tr><td>3</td><td>€125,000</td><td>€16,000</td><td>7 training slots (dual training possible), base value + 3</td></tr>
+</tbody>
+</table>
+
+<h3>Academy</h3>
+<table>
+<thead><tr><th>Level</th><th>Cost</th><th>Maintenance/match</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>– (start)</td><td>€0</td><td>2 theory slots, skill limit 1</td></tr>
+<tr><td>2</td><td>€50,000</td><td>€7,000</td><td>4 theory slots, skill limit 2</td></tr>
+<tr><td>3</td><td>€125,000</td><td>€16,000</td><td>6 theory slots, skill limit 3</td></tr>
+</tbody>
+</table>
+<p class="hint">The skill limit additionally increases by 1 for every age phase reached from Peak onward (section 21), independent of the academy level.</p>
+
+<h3>Medical department</h3>
+<table>
+<thead><tr><th>Level</th><th>Cost</th><th>Maintenance/match</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>– (start)</td><td>€0</td><td>1 treatment slot, healing 2 games of absence/match</td></tr>
+<tr><td>2</td><td>€35,000</td><td>€5,000</td><td>2 treatment slots, healing 3/match, age-decline chance −10%, phase transition delayed by +2 games</td></tr>
+<tr><td>3</td><td>€90,000</td><td>€11,000</td><td>3 treatment slots, healing 4/match, age-decline chance −20%, phase transition delayed by +4 games</td></tr>
+</tbody>
+</table>
+
+<h3>Stadium</h3>
+<p>Every club needs a venue, so there is no level 0. The attendance die combines with reputation to determine attendance revenue (section 23); the stadium level is also the cap up to which the fan shop and catering may be upgraded.</p>
+<table>
+<thead><tr><th>Level</th><th>Cost</th><th>Maintenance/match</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>– (start)</td><td>€0</td><td>Attendance die d6, fan shop/catering up to level 1</td></tr>
+<tr><td>2</td><td>€60,000</td><td>€6,000</td><td>d8, fan shop/catering up to level 2</td></tr>
+<tr><td>3</td><td>€150,000</td><td>€13,500</td><td>d10, up to level 3</td></tr>
+<tr><td>4</td><td>€375,000</td><td>€37,000</td><td>d15, up to level 4</td></tr>
+<tr><td>5</td><td>€900,000</td><td>€67,000</td><td>d20, up to level 5</td></tr>
+</tbody>
+</table>
+
+<h3>Fan shop</h3>
+<table>
+<thead><tr><th>Level</th><th>Cost</th><th>Maintenance/match</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>–</td><td>€0</td><td>no extra revenue (not built yet)</td></tr>
+<tr><td>1</td><td>€15,000</td><td>€0</td><td>€3,000 / match</td></tr>
+<tr><td>2</td><td>€40,000</td><td>€3,500</td><td>€6,000 / match</td></tr>
+<tr><td>3</td><td>€95,000</td><td>€8,200</td><td>€10,000 / match</td></tr>
+<tr><td>4</td><td>€235,000</td><td>€12,000</td><td>€15,000 / match</td></tr>
+<tr><td>5</td><td>€585,000</td><td>€17,400</td><td>€21,000 / match</td></tr>
+</tbody>
+</table>
+
+<h3>Catering</h3>
+<table>
+<thead><tr><th>Level</th><th>Cost</th><th>Maintenance/match</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>–</td><td>€0</td><td>no catering bonus</td></tr>
+<tr><td>1</td><td>€5,000</td><td>€0</td><td>+5% of attendance revenue</td></tr>
+<tr><td>2</td><td>€12,000</td><td>€1,300</td><td>+8%</td></tr>
+<tr><td>3</td><td>€30,000</td><td>€2,700</td><td>+12%</td></tr>
+<tr><td>4</td><td>€75,000</td><td>€3,700</td><td>+17%</td></tr>
+<tr><td>5</td><td>€190,000</td><td>€5,300</td><td>+23%</td></tr>
+</tbody>
+</table>
+
+<h3>Public relations</h3>
+<table>
+<thead><tr><th>Level</th><th>Cost</th><th>Maintenance/match</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>–</td><td>€0</td><td>no PR bonus</td></tr>
+<tr><td>1</td><td>€10,000</td><td>€0</td><td>win gain +10%, loss softened by 10%</td></tr>
+<tr><td>2</td><td>€25,000</td><td>€3,000</td><td>±20%</td></tr>
+<tr><td>3</td><td>€60,000</td><td>€7,000</td><td>±30%</td></tr>
+<tr><td>4</td><td>€150,000</td><td>€16,000</td><td>±40%</td></tr>
+<tr><td>5</td><td>€375,000</td><td>€35,000</td><td>±50%</td></tr>
+</tbody>
+</table>
+
 <p>Each facility has its own page showing current and future maintenance costs plus an upgrade button (stadium, fan shop, and catering are bundled on <code>stadium.html</code>; the others are <code>training.html</code>, <code>academy.html</code>, <code>medical.html</code>, <code>public-relations.html</code>).</p>
 
 <h2 id="liga">25. The league</h2>
